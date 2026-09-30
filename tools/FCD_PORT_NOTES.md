@@ -266,3 +266,29 @@ unknown), `weather_platform_fetch()` to be implemented on top of FCD. `tools/wea
 The game's clock is an `OSCalendarTime` at `0x80600898` (set from `OSGetTime` `0x803855d4` + a bias; `OSTicksToCalendarTime` `0x80385820`,
 `OSCalendarTimeToTicks` `0x803859e8`).
 Build note: with `-Os` devkitPPC emits calls to libgcc's `_restgpr_26_x`; build with `-O2` (or provide the helper) for the in-game image.
+
+## Code cave and build pipeline (tools/weather/build_patch.py)
+
+Where the code lives. `main.dol` has no usable free space: text section 0 has only fragmented zero runs (largest 904 bytes), and the 150 KB zero run at
+`0x804b0dac`-`0x804d5908` is the reserved load area of the mod's own BREWSTER module loader (hooks branch into it from `0x8016bb6c` and `0x805174bc`), so it
+is not free. The main thread stack is `0x80753a40`-`0x80763a40`. The blob therefore goes in a new DOL text section at **0x80764000** (just above the stack,
+inside what `OSInit` would hand to the heap) and the arena start is moved past it: `OSInit` calls `OSSetMEM1ArenaLo` (`0x8037be1c`) at `0x8037ab10`; that call
+is redirected to `tramp_arena`, which clamps the value to `weather_blob_end` (any of OSInit's three code paths can produce it). The game's own heap setup
+(`0x80441520`) reads the arena low/high dynamically, so its root heaps start after the blob.
+
+FCD transplant (`fcdgen.py`). The donor FCD code (s.dol `0x80562950`-`0x8056481c`, 7.9 KB) is turned into relocatable assembly: branches become labels, everything
+else stays `.long`, and the references that cannot stay are rewritten. FCD_LoadLZ (`0x805633d8`) is replaced by `fcd_load_lz`; `0x804417b0` by `fcd_crc32`; the
+MW runtime helpers map by a constant offset (`donor - 0x1bd7a8`, the block is identical); `VFMount` is `0x80434e44` (the one whose helper thunk matches the
+donor with 0 mismatches; `0x80434cb8` is a different variant). FCD's own data (context struct, the two path tables, the init flag, three pointer variables
+and two inline strings that lived in the donor's SDA) is emitted as our own data, and its 15 r13 accesses become absolute accesses through r12 (checked dead at each
+site). `build_patch.py` verifies the result: all 366 branches reach the same target as in the donor, and all 15 data-object and 15 SDA references compute the
+intended addresses.
+
+Outputs: `main.weather.dol` (patched DOL with the new section), `RUUE02-weather.xml` (Riivolution), `weather-patch.json`. This cannot be a Gecko code: the blob
+is 13 KB and the arena change runs once in OSInit before any code handler exists, so the feature ships as Riivolution / patched DOL only.
+
+Heap: the NWC24 heap size (`0x800e94a8`) grows from `0x5C800` to `0xA4800` for the `0x48000` forecast buffer.
+
+Flow of `weather_platform_fetch` (fcd_fetch.c), after M&S's own routine: alloc from the NWC24 heap -> `0x8040c7dc` (acquire IOS resource) -> `FCDInit` ->
+`FCDGetOwnAddressId` -> for each of 7 days `FCDGetForecast(id, 0, t, out)` with t = `OSCalendarTimeToTicks(date) - 6h - dayBack*24h + n*24h` -> read the u16 at
+`out+0x10` -> `FCDFinalize` -> `0x8040c990` (release) -> free.

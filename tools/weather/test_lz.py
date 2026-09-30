@@ -5,7 +5,7 @@ Compiles the loader natively with a mock VF layer that clamps at EOF the way
 City Folk's VFRead does, then decodes data produced by an independent encoder
 in 0x2000-byte chunks, including streams that split tokens across chunks.
 """
-import ctypes, os, random, subprocess, sys, tempfile
+import ctypes, os, random, subprocess, sys, tempfile, zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -14,6 +14,7 @@ SHIM = r'''
 #include <string.h>
 #include "fcd_loader.h"
 FcdCtx fcd_ctx;
+const u32 fcd_crc_table[16] = { %CRCTAB% };
 static const unsigned char *g_data; static unsigned g_len, g_pos;
 void fcd_test_set(const unsigned char *d, unsigned n) { g_data = d; g_len = n; g_pos = 0;
     if (!fcd_ctx.tmp) fcd_ctx.tmp = malloc(FCD_CHUNK); }
@@ -66,7 +67,13 @@ def enc(data, ext):
 def main():
     t = tempfile.mkdtemp()
     try:
-        open(f"{t}/shim.c", "w").write(SHIM)
+        tab = []
+        for i in range(16):
+            c = i
+            for _ in range(4):
+                c = (c >> 1) ^ (0xEDB88320 if c & 1 else 0)
+            tab.append("0x%08X" % c)
+        open(f"{t}/shim.c", "w").write(SHIM.replace("%CRCTAB%", ", ".join(tab)))
         so = f"{t}/fcd.so"
         subprocess.check_call(["cc", "-O1", "-shared", "-fPIC", "-DFCD_HOST", "-I", HERE,
                                f"{t}/shim.c", f"{HERE}/fcd_loader.c", "-o", so])
@@ -107,6 +114,12 @@ def main():
         rc = lib.fcd_load_lz(b"x", 4096, dst, ctypes.byref(o)); print("truncated rc =", rc, "OK" if rc == -11 else "FAIL"); bad += rc != -11
         lib.fcd_test_set(buf, len(comp))
         rc = lib.fcd_load_lz(b"x", 16, dst, ctypes.byref(o)); print("over maxSize rc =", rc, "OK" if rc == -11 else "FAIL"); bad += rc != -11
+        # fcd_crc32 (donor 0x804417b0) must be standard CRC-32
+        lib.fcd_crc32.argtypes = [ctypes.c_char_p, ctypes.c_uint]; lib.fcd_crc32.restype = ctypes.c_uint
+        for data in (b"", b"a", b"123456789", bytes(range(256)) * 3, b"HAF0" + bytes(24)):
+            ok = lib.fcd_crc32(data, len(data)) == zlib.crc32(data)
+            bad += not ok
+            print("crc32 %5d bytes: %s" % (len(data), "OK" if ok else "FAIL"))
         print("FAILED" if bad else "all passed")
         return 1 if bad else 0
     finally:

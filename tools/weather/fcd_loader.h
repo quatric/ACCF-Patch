@@ -11,6 +11,7 @@ typedef unsigned char  u8;
 typedef unsigned short u16;
 typedef unsigned int   u32;
 typedef int            s32;
+typedef unsigned long long u64;
 
 /* FCDGetWorkMemorySize() is 0x3909C. City Folk gets a ~1.25x buffer for
  * forecast.bin (0x32000) + short.bin (0x5000) + savedata and the read chunk. */
@@ -32,6 +33,8 @@ typedef struct FcdCtx {
 /* FCD_LoadLZ: drop-in for s.dol 0x805633d8.
  * Returns 0, -10 (VF open/read failed) or -11 (bad or truncated LZ data). */
 s32 fcd_load_lz(const char *path, u32 maxSize, void *dst, u32 *outSize);
+
+u32 fcd_crc32(const u8 *p, u32 len);
 
 /* Allocate/free the FCD work buffer from the NWC24 heap. */
 void *fcd_work_alloc(void);

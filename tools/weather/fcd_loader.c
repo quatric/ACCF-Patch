@@ -1,6 +1,7 @@
 #include "fcd_loader.h"
 
 extern FcdCtx fcd_ctx;
+extern const u32 fcd_crc_table[16];    /* donor's nibble table, emitted by fcdgen.py */
 
 #ifdef FCD_HOST
 /* host test shim provides these */
@@ -161,3 +162,16 @@ void fcd_work_free(void *p)
         ((void (*)(EggHeap *, void *))h->vtbl[0x18 / 4])(h, p);
 }
 #endif
+
+/* donor 0x804417b0: CRC-32 (init 0xFFFFFFFF, final NOT), two table steps per byte */
+u32 fcd_crc32(const u8 *p, u32 len)
+{
+    u32 crc = 0xFFFFFFFFu;
+
+    while (len--) {
+        crc ^= *p++;
+        crc = (crc >> 4) ^ fcd_crc_table[crc & 15];
+        crc = (crc >> 4) ^ fcd_crc_table[crc & 15];
+    }
+    return ~crc;
+}

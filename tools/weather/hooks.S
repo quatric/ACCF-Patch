@@ -4,7 +4,6 @@
  * The trampoline runs the C glue, then either returns early or executes the
  * displaced instruction and branches back to site+4.
  */
-    .set r0,0; .set r1,1; .set r3,3; .set r4,4; .set r31,31
 
 /* Return addresses (site + 4) are external symbols supplied by the linker, see link.ld:
  *   ret_type_now  = 0x801c9d28   (site 0x801c9d24: stwu r1,-0x10(r1))
@@ -14,6 +13,7 @@
  *   ret_pad       = 0x804438e4   (site 0x804438e0: stw r3,0x854(r31), right after KPADRead)
  */
     .extern ret_type_now, ret_type_next, ret_tv, ret_link, ret_pad
+    .extern accf_OSSetMEM1ArenaLo, weather_blob_end
     .extern weather_type_for_date, weather_tv_for_date, weather_on_module_link, weather_hook_pad
 
     .text
@@ -74,3 +74,15 @@ tramp_pad:
     mtlr    r0
     addi    r1,r1,0x20
     b       ret_pad
+
+/* OSInit: `bl OSSetMEM1ArenaLo` (0x8037ab10) is redirected here. The arena must start
+ * above the blob (0x80764000..weather_blob_end), whichever value OSInit computed:
+ * arenaLo = max(r3, weather_blob_end), then tail-call the real setter. */
+    .globl tramp_arena
+tramp_arena:
+    lis     r0,weather_blob_end@h
+    ori     r0,r0,weather_blob_end@l     /* (addi would read r0 as zero) */
+    cmplw   r3,r0
+    bge     1f
+    mr      r3,r0
+1:  b       accf_OSSetMEM1ArenaLo
