@@ -128,6 +128,27 @@ def main():
         L.weather_sample_buttons(B_CORE, 2, B_CL)
         check("B after the title screen is ignored", ctypes.c_int(L.weather_is_disabled()).value, 0)
         check("...and weather stays on", L.weather_type_for_date(ctypes.byref(d0)), 0)
+        # hooks: pad sampler reads the controller layout, module link closes the window
+        L.weather_hook_pad.argtypes = [ctypes.c_void_p]
+        L.weather_on_module_link.argtypes = [ctypes.c_uint]
+        def ctrl(count, hold=0, dev=0, cl=0):
+            buf = (ctypes.c_ubyte * 0x900)()
+            import struct
+            struct.pack_into(">i", buf, 0x854, count)
+            struct.pack_into(">I", buf, 0x14, hold); buf[0x14 + 0x5C] = dev; struct.pack_into(">I", buf, 0x14 + 0x60, cl)
+            return buf
+        if True:
+            setup(week); L.weather_hook_pad(ctrl(1, hold=B_CORE))
+            check("pad hook: core B", ctypes.c_int(L.weather_is_disabled()).value, 1)
+            setup(week); L.weather_hook_pad(ctrl(1, dev=2, cl=B_CL))
+            check("pad hook: classic B", ctypes.c_int(L.weather_is_disabled()).value, 1)
+            setup(week); L.weather_hook_pad(ctrl(0, hold=B_CORE))
+            check("pad hook: no samples ignored", ctypes.c_int(L.weather_is_disabled()).value, 0)
+        for mid, want in [(0xA5, 0), (0xA6, 0), (0xA2, 0), (1, 0), (0x57, 1)]:
+            setup(week); L.weather_on_module_link(mid); L.weather_sample_buttons(B_CORE, 0, 0)
+            check(f"module {mid:#x} link closes the B window" if want == 0 else f"module {mid:#x} link does not", ctypes.c_int(L.weather_is_disabled()).value, want)
+        setup(week); L.weather_type_for_date(ctypes.byref(d0)); L.weather_sample_buttons(B_CORE, 0, 0)
+        check("first weather call also closes the window", ctypes.c_int(L.weather_is_disabled()).value, 0)
         print("FAILED" if bad else "all passed")
         return 1 if bad else 0
     finally:

@@ -105,12 +105,16 @@ static s32 cache_type(const CalTime *c, s32 queryBack)
 
 s32 weather_type_for_date(const CalTime *date)
 {
+    g_titleReached = 1;     /* weather code only runs in town, which is past the title */
     return cache_type(date, 0);
 }
 
 s32 weather_tv_for_date(const CalTime *date)
 {
-    s32 t = cache_type(date, 1);
+    s32 t;
+
+    g_titleReached = 1;
+    t = cache_type(date, 1);
     return t < 0 ? -1 : (s32)weather_tv_program((u8)t);
 }
 
@@ -126,3 +130,24 @@ void weather_sample_buttons(u32 coreHold, u8 devType, u32 classicHold)
 
 void weather_title_reached(void) { g_titleReached = 1; }
 s32  weather_is_disabled(void)   { return g_off; }
+
+/* the game's memory is big-endian; explicit loads keep this testable on any host */
+static u32 rd32be(const u8 *p)
+{
+    return ((u32)p[0] << 24) | ((u32)p[1] << 16) | ((u32)p[2] << 8) | (u32)p[3];
+}
+
+void weather_hook_pad(const u8 *ctrl)
+{
+    const u8 *st = ctrl + WEATHER_CTRL_STATUS;
+
+    if (g_titleReached || (s32)rd32be(ctrl + WEATHER_CTRL_COUNT) <= 0)
+        return;
+    weather_sample_buttons(rd32be(st), st[WEATHER_KPAD_DEV], rd32be(st + WEATHER_KPAD_CLHOLD));
+}
+
+void weather_on_module_link(u32 id)
+{
+    if (id == 0xA5 || id == 0xA6 || id == 0xA2 || id == 0x01)
+        g_titleReached = 1;
+}

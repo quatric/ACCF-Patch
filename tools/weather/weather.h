@@ -49,6 +49,18 @@ s32 weather_tv_for_date(const CalTime *date);
 #define WEATHER_CLASSIC_B 0x0040u
 void weather_sample_buttons(u32 coreHold, u8 devType, u32 classicHold);
 void weather_title_reached(void);
+
+/* Glue called from the hook trampolines (hooks.S):
+ *   weather_hook_pad:         after KPADRead in the EGG CoreController update (0x804438dc);
+ *                             `ctrl` is the controller, samples at +0x14 (KPADStatus, 0x84 bytes), count at +0x854
+ *   weather_on_module_link:   module link request (0x80086e00); closes the B window when a
+ *                             scene module (title demo 0xA5, 0xA6, select 0xA2, stage 0x01) is linked */
+#define WEATHER_CTRL_STATUS   0x14
+#define WEATHER_CTRL_COUNT    0x854
+#define WEATHER_KPAD_DEV      0x5C
+#define WEATHER_KPAD_CLHOLD   0x60
+void weather_hook_pad(const u8 *ctrl);
+void weather_on_module_link(u32 id);
 s32  weather_is_disabled(void);
 
 void weather_reset(void);   /* tests */
