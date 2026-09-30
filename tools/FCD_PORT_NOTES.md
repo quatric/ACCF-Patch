@@ -195,3 +195,15 @@ Nookipedia's Weather page lists no temperature, wind, UV index or humidity mecha
 - Cloud density is a separate layer: `0x801c9e14` derives a cloud level from the same day pattern (u8 table at `0x8047e960`), not from the weather type.
   Overriding only the final type leaves the clouds on the vanilla pattern.
 - City Folk eases weather changes in over the last ten minutes of the hour, and rainbows follow heavy rain. A constant all-day type removes those transitions.
+
+## Decision: hook the final type, leave the pattern functions alone
+
+Pattern selection (`0x801c9c08` this hour, `0x801c9cac` next hour) is not modified. The forecast override goes on the return value of the type
+functions `0x801c9d24` (this hour) and `0x801c9d9c` (next hour), after their snow-season remap.
+
+What stays on the vanilla pattern as a result (callers of the pattern functions, all outside the dWeather type logic):
+- `0x80039bac` and `0x800ec72c` only test `pattern == 0` (the "fine day" pattern) and act on it.
+- `0x801ad590` calls `0x801c9cac` and range-tests the pattern (0-6, 7-8, 0x10-0x12, 0x13-0x15, 0x16-0x19 against the date) before asking `0x801c9d9c`
+  for a next-hour type, so it does go through the type hook once its own gate passes.
+- The cloud level (`0x801c9e14`, from the pattern via the u8 table at `0x8047e960`) has no direct callers (reached indirectly), so it is also untouched.
+Open item: decide whether to also derive the cloud level from the forecast type with a separate override.
