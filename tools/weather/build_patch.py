@@ -242,7 +242,7 @@ def main():
     open(os.path.join(a.out, "RUUE02-weather.xml"), "w").write(riivolution_xml(patches))
     json.dump({"base": BASE, "blob_end": syms["weather_blob_end"],
                "patches": [{"address": va, "bytes": d.hex()} for va, d in patches if va != BASE],
-               "symbols": {k: v for k, v in syms.items() if k.startswith(("tramp_", "FCD", "fcd_", "weather_"))}},
+               "symbols": {k: v for k, v in syms.items() if k.startswith(("tramp_", "FCD", "fcd_", "weather_", "g_", "out."))}},
               open(os.path.join(a.out, "weather-patch.json"), "w"), indent=1)
     print("patches: %d memory writes + blob; wrote main.weather.dol, RUUE02-weather.xml, weather-patch.json" % (len(patches) - 1))
     for va, d in patches:

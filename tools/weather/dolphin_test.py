@@ -36,10 +36,9 @@ def main():
     user = os.path.join(build, "dolphin_user")
     shutil.rmtree(user, ignore_errors=True)
     os.makedirs(os.path.join(user, "Config"))
-    ini = open(os.path.expanduser("~/Library/Application Support/Dolphin/Config/Dolphin.ini")).read()
-    ini = ini.replace("[General]\n", "[General]\nGDBPort = %d\n" % PORT, 1)
-    for k in ("WiimoteContinuousScanning", "WiimoteControllerInterface", "EnableWiiLink", "WiiSDCard"):
-        ini = "\n".join(("%s = False" % k) if ln.startswith(k + " =") else ln for ln in ini.split("\n"))   # no Bluetooth/network/SD prompts
+    ini = ("[General]\nGDBPort = %d\n[Interface]\nConfirmStop = False\nUsePanicHandlers = False\n"
+           "[Core]\nMMU = True\nCPUThread = False\nCPUCore = 4\nWiimoteContinuousScanning = False\n"
+           "WiimoteControllerInterface = False\nEnableWiiLink = False\n[Analytics]\nPermissionAsked = True\nEnabled = False\n" % PORT)
     open(os.path.join(user, "Config", "Dolphin.ini"), "w").write(ini)
     cmd = [DOLPHIN, "-b", "-u", user, "-e", disc, "-v", "Null"]
     print("launching:", " ".join(cmd))
@@ -114,17 +113,24 @@ def main():
             check(cur == want, "%#010x holds %s" % (va, cur.hex()))
 
         print("\n== weather state ==")
-        def u8(name):
-            return g.read_mem(sym[name], 1)[0]
-        for name in ("g_titleReached", "g_off"):
-            if name in sym:
-                print("  %s = %d" % (name, u8(name)))
-        if "g_titleReached" in sym:
-            check(u8("g_titleReached") == 1, "title-reached hook fired during boot")
-        if "g_off" in sym:
-            check(u8("g_off") == 0, "B latch not set (nothing was held)")
-        fl = struct.unpack(">I", g.read_mem(sym["fcd_flag"], 4))[0]
-        print("  fcd_flag = %d (0 = FCD not initialised, nothing fetched yet)" % fl)
+        def rd32(name, off=0):
+            return struct.unpack(">I", g.read_mem(sym[name] + off, 4))[0]
+        title, off_latch = g.read_mem(sym["g_titleReached"], 1)[0], g.read_mem(sym["g_off"], 1)[0]
+        last_try = struct.unpack(">i", g.read_mem(sym["g_lastTryDay"], 4))[0]
+        n_days = rd32("g_cache", 4)
+        raw = rd32("fcd_ctx", 0x18)
+        flag = rd32("fcd_flag")
+        print("  g_titleReached = %d, g_off = %d, g_lastTryDay = %d, cached days = %d" % (title, off_latch, last_try, n_days))
+        print("  fcd_ctx.raw = %#010x (work buffer), fcd_flag = %d" % (raw, flag))
+        check(title == 1, "a weather hook ran and closed the B window (title reached)")
+        check(off_latch == 0, "B latch not set (nothing was held)")
+        if last_try != 0:
+            # the game day number is days since 1970; 2009-2036 is 14000..24000
+            check(10000 < last_try < 40000, "a fetch was attempted for a sane game day (%d)" % last_try)
+            check(0x90000000 <= raw < 0x94000000, "FCDInit got a work buffer from the NWC24 heap in MEM2 (%#010x)" % raw)
+            check(flag == 0 and n_days == 0, "fetch found no Forecast Channel data here, so vanilla weather stays (flag 0, 0 cached days)")
+        else:
+            print("  (no fetch attempted in this window)")
         print("\nFAILED" if fail else "\nall checks passed")
     finally:
         proc.terminate()

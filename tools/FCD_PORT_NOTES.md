@@ -292,3 +292,21 @@ Heap: the NWC24 heap size (`0x800e94a8`) grows from `0x5C800` to `0xA4800` for t
 Flow of `weather_platform_fetch` (fcd_fetch.c), after M&S's own routine: alloc from the NWC24 heap -> `0x8040c7dc` (acquire IOS resource) -> `FCDInit` ->
 `FCDGetOwnAddressId` -> for each of 7 days `FCDGetForecast(id, 0, t, out)` with t = `OSCalendarTimeToTicks(date) - 6h - dayBack*24h + n*24h` -> read the u16 at
 `out+0x10` -> `FCDFinalize` -> `0x8040c990` (release) -> free.
+
+## Verification in Dolphin (tools/weather/dolphin_test.py)
+
+Procedure: apply the patch to a **pristine** extraction of the image (`wit extract <image.wbfs> dir --psel data`, replace `sys/main.dol` with
+`main.weather.dol`, `wit copy dir out.wbfs --wbfs`), then run `dolphin_test.py out.wbfs <build dir> 60`. It boots in an isolated Dolphin user folder with the
+GDB stub and inspects MEM1 from outside. Notes learned the hard way: a tree that has extra unpacked `*.d` folders (or that already carries other patches) does not
+rebuild into a bootable disc; Dolphin's GDB stub takes a single client, so nothing else may connect while the test runs; Dolphin needs a real GUI session
+(offscreen Qt aborts) and stalls forever on an image it cannot boot (a modal dialog).
+
+Result on the patched game after 60 s of emulation (Dolphin 2609-7, RUUE02 revision 0):
+- the blob is resident at `0x80764000` with its code unchanged, so the heap did not claim it: the arena clamp works;
+- all seven patch sites hold the new instructions;
+- a weather hook ran (the title-screen scenery uses `dWeather`): the B window closed, the B latch was not set, a fetch was attempted for game day 20726 (= 2026-09-30, the
+  real date, which validates the calendar/day math in the real game), `FCDInit` received its work buffer from the NWC24 heap (a MEM2 address, so the heap growth and the
+  EGG vtable allocation work), and because this emulator has no Forecast Channel data the fetch returned nothing and the game kept its vanilla weather.
+
+Not yet exercised: the success path (valid `wc24dl.vff` with `forecast.bin`/`short.bin`), the B-held path with a real controller, and the TV hook. The emulator's NAND has no
+Forecast Channel data; testing the parser end to end needs a real or synthetic `wc24dl.vff`.
