@@ -192,8 +192,7 @@ ACCF still needs: an allocator choice for the 0x3909C buffer (M&S's `0x8013f744`
 
 Nookipedia's Weather page lists no temperature, wind, UV index or humidity mechanic for City Folk or Wild World. Weather there is purely visual and seasonal
 (rain, snow, cloud density, plus aurora, rainbows and meteor showers). So the forecast's temperature/UV/wind fields can be ignored. Things to keep in mind:
-- Cloud density is a separate layer: `0x801c9e14` derives a cloud level from the same day pattern (u8 table at `0x8047e960`), not from the weather type.
-  Overriding only the final type leaves the clouds on the vanilla pattern.
+- (Correction) `0x801c9e14` is **not** cloud density. See "TV forecast" below. Sky and lighting read the stored type (`dWeather_c+0x5884`) and the blend float (`+0x5890`), so they follow the final-type hook.
 - City Folk eases weather changes in over the last ten minutes of the hour, and rainbows follow heavy rain. A constant all-day type removes those transitions.
 
 ## Decision: hook the final type, leave the pattern functions alone
@@ -205,5 +204,18 @@ What stays on the vanilla pattern as a result (callers of the pattern functions,
 - `0x80039bac` and `0x800ec72c` only test `pattern == 0` (the "fine day" pattern) and act on it.
 - `0x801ad590` calls `0x801c9cac` and range-tests the pattern (0-6, 7-8, 0x10-0x12, 0x13-0x15, 0x16-0x19 against the date) before asking `0x801c9d9c`
   for a next-hour type, so it does go through the type hook once its own gate passes.
-- The cloud level (`0x801c9e14`, from the pattern via the u8 table at `0x8047e960`) has no direct callers (reached indirectly), so it is also untouched.
-Open item: decide whether to also derive the cloud level from the forecast type with a separate override.
+- `0x801c9e14` is the TV furniture's weather program for tomorrow (next section); it is called from `d_ftr_managerNP.rel`, which is why `main.dol` shows no callers.
+Open item: drive the TV program from the forecast too.
+
+## Sky/cloud consumers and the TV forecast
+
+- No separate cloud-density function exists. All sky/lighting code is in `main.dol` and reads `dWeather_c+0x5884` (type), `+0x5888` (next type) and the float at
+  `+0x5890` (computed by `0x801c9858` from the two types, blended over the last minutes of the hour). Readers of the type (besides dWeather itself):
+  `0x80035904 0x80057468 0x8006354c 0x8007e074 0x8007e0c0 0x800c042c 0x800c0460 0x80102484 0x80128d68 0x80131af4 0x801356cc 0x80135714 0x80196f38 0x801970b0 0x801a9430 0x801cdde4 0x801dd5e0 0x801e2ee4`.
+  `0x801c987c` returns a class for the current type (identity 0-6 from the table at `0x80500438`, 7 while sakura is active; caller `0x8019e378`).
+  No REL reads the dWeather instance directly. `d_skyNP.rel` imports none of the weather functions.
+- `0x801c9e14(date)` -> TV program index, used only by `d_ftr_managerNP.rel` (`sec1+0x3f10`), which first advances the date by one day via `0x8016d7b8`
+  (so the TV shows **tomorrow**). The index selects `/Ftr/tv_program_XY.brres` from a pointer table in the REL:
+  `0 ff, 1 cc, 2 rr, 3 fc, 4 cf, 5 fr, 6 cr, 7 rc, 8 ss, 9 cs, 10 sc` (f fine, c cloudy, r rain, s snow). The function itself only produces 0, 1, 2 from the
+  pattern (u8 table `0x8047e960`: patterns 0-6 -> 0, 7-9 -> 1, 10-15 -> 2) and, in snow season, remaps 2 -> 8 (6 -> 9, 7 -> 0xa are unreachable).
+  Plan: make it return the TV program for forecast day +1: type 0 -> 0 (ff), 1/2 -> 1 (cc), 3/4 -> 2 (rr), 5/6 -> 8 (ss).
