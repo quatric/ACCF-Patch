@@ -140,6 +140,11 @@ def run_patch(image_path, log, done, sdhc=True, gc=False, weather=False):
                 raise RuntimeError('could not find sys/main.dol in the extracted disc')
 
             d = Dol(dol_path)
+            if sdhc and all(bytes(d.read(va, len(b)) or b'') == b for va, b in dist.rebased_patches(delta)[0]):
+                log('SDHC support is already in this disc, skipping that patch')
+                sdhc = False
+                if not (gc or weather):
+                    raise RuntimeError('this disc already has SDHC support; nothing left to add.')
             bad = dist.verify_target(d, delta) if sdhc else None
             if bad:
                 raise RuntimeError(
