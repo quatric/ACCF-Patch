@@ -30,6 +30,15 @@ addresses to a Rev 0 disc, and doing so silently breaks SDHC detection (the
 card comes up as an unknown device) or crashes the title. See
 [Revision matters](#️-revision-matters--check-yours-first).
 
+## GameCube controller (optional)
+
+Play with a GameCube controller in **port 1** — no Wii Remote needed. The pad
+reaches the game as a Classic Controller, so it runs on Vague Rant's Classic
+Controller support, with the pointer on the C-stick. Tick *Also add GameCube
+controller support* in the patcher, or use the per-revision Gecko codes in
+[`gcpad/gecko/`](gcpad/). Controls, how it works and what has (and hasn't)
+been tested are in [`gcpad/README.md`](gcpad/README.md).
+
 ## What it does
 
 City Folk's bundled PFD SD driver only understands standard-capacity cards: it

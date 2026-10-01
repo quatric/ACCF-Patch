@@ -10,9 +10,9 @@ dnd_datas, dnd_binaries, dnd_hidden = collect_all('tkinterdnd2')
 
 a = Analysis(
     ['gui.py'],
-    pathex=[],
+    pathex=[os.path.join(SPECPATH, '..', 'gcpad')],
     binaries=dnd_binaries,
-    datas=dnd_datas,
+    datas=dnd_datas + [(os.path.join(SPECPATH, '..', 'gcpad', 'patches.json'), 'gcpad')],
     hiddenimports=dnd_hidden,
     hookspath=[],
     hooksconfig={},

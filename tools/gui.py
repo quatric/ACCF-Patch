@@ -24,7 +24,9 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'gcpad'))
 import dist
+import patch_dol
 from dol import Dol
 
 try:
@@ -75,7 +77,13 @@ def key_for(disc_id, disc_ver):
     return None, None, None
 
 
-def run_patch(image_path, log, done):
+def gcpad_dir():
+    if getattr(sys, 'frozen', False):
+        return os.path.join(getattr(sys, '_MEIPASS', os.path.dirname(sys.executable)), 'gcpad')
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'gcpad')
+
+
+def run_patch(image_path, log, done, gc=False):
     try:
         wit = find_wit()
         if wit is None:
@@ -125,7 +133,11 @@ def run_patch(image_path, log, done):
                 if fo is None:
                     raise RuntimeError('unmapped patch address 0x%08X' % va)
                 data[fo:fo + len(blob)] = blob
-            open(dol_path, 'wb').write(bytes(data))
+            data = bytes(data)
+            if gc:
+                data = patch_dol.apply(data, patch_dol.load(key, root=gcpad_dir()))
+                log('  added GameCube controller (port 1) support')
+            open(dol_path, 'wb').write(data)
             log('  patched main.dol (%d writes)' % len(patches))
 
             staged = os.path.join(tmp, 'patched.img')
@@ -171,6 +183,10 @@ class App(BASE):
         if HAVE_DND:
             self.drop.drop_target_register(DND_FILES)
             self.drop.dnd_bind('<<Drop>>', self.on_drop)
+
+        self.gc = tk.BooleanVar(value=False)
+        tk.Checkbutton(self, text='Also add GameCube controller support (port 1)',
+                       variable=self.gc).pack()
 
         tk.Label(self, text='The original is kept alongside as <name>.bak',
                  fg='#666').pack()
@@ -235,7 +251,8 @@ class App(BASE):
             target=run_patch,
             args=(image_path,
                   lambda t: self.msgq.put(('log', t)),
-                  lambda ok, m: self.msgq.put(('done', (ok, m)))),
+                  lambda ok, m: self.msgq.put(('done', (ok, m))),
+                  self.gc.get()),
             daemon=True,
         ).start()
 
