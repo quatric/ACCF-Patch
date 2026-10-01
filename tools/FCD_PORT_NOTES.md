@@ -351,3 +351,4 @@ fetch racing the game's own NWC24 use of drive `C`.
 ## City exclusion (final)
 
 The game's own City test is `0x801c9578`: it returns 1 when the byte table at `0x80479F10` (0x44 entries, accessor `0x8016286c`) is nonzero for the scene kind (kinds 0x2d-0x37), or the kind is 0x3d. The weather init then uses the City type function `0x801c9d9c` instead of the town's `0x801c9d24`. The earlier guess (flag bit 0x200 of the table at `0x80479BE0`) was wrong and let the town forecast leak into the City. `weather_platform_scene_flags()` now mirrors the game's test. Verified by playing: the town shows the forecast weather, the City keeps its own.
+Also verified by playing: holding B before the title screen disables the external weather.
