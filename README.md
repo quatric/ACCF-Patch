@@ -44,8 +44,8 @@ been tested are in [`gcpad/README.md`](gcpad/README.md).
 ## Forecast Channel weather (optional)
 
 Replaces the town's weather with the Forecast Channel's 7-day data for the console's own location (the City keeps its own). Works on every revision;
-see [`tools/weather/README.md`](tools/weather/README.md). It needs a Mario & Sonic Winter Olympics disc to build, so its patcher checkbox only lights up
-after you've run `tools/weather/build_all.py` once.
+see [`tools/weather/README.md`](tools/weather/README.md). The patch data ships with the patcher (`tools/weather/weather_patches.json`);
+rebuilding it needs a Mario & Sonic Winter Olympics disc.
 
 ## What it does
 

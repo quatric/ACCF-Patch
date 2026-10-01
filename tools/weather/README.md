@@ -17,8 +17,8 @@ needs devkitPPC (`DEVKITPPC`, default `/opt/devkitpro/devkitPPC`). The donor sup
     python3 build_all.py --dols <dir of <REV>.dol> --donor <Mario & Sonic main.dol> --out build/
 
 builds every revision (`build/<REV>/main.weather.dol`, `build/riivolution/<REV>-weather.xml`) and writes `weather_patches.json`, which the patcher
-(`tools/gui.py`, *Also add Forecast Channel weather*) and `apply_weather.py` use. That file contains the Mario & Sonic Forecast Channel code, so it is
-made on your machine from your own disc and is git-ignored; the checkbox stays disabled without it. It combines with the SDHC patch and the GameCube
+(`tools/gui.py`, *Also add Forecast Channel weather*) and `apply_weather.py` use. That file contains the Mario & Sonic Forecast Channel code; it is committed and bundled into the
+released patcher, so the checkbox is enabled out of the box (rerun `build_all.py` to regenerate it). It combines with the SDHC patch and the GameCube
 controller patch (each takes its own DOL section; weather sits above the main thread stack, the controller code in low memory).
 
 ## Test

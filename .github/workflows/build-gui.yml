@@ -84,6 +84,7 @@ jobs:
           pyinstaller --name ACCF-Patcher --windowed --noconfirm \
             --collect-all tkinterdnd2 \
             --paths gcpad --paths tools/weather --add-data gcpad/patches.json:gcpad \
+            --add-data tools/weather/weather_patches.json:. \
             --icon assets/icon.icns --target-architecture universal2 \
             $BINS --distpath pyinst_dist tools/gui.py
           cp wit-gpl-2.0.txt "pyinst_dist/ACCF-Patcher.app/Contents/Resources/wit-gpl-2.0.txt"
@@ -98,6 +99,7 @@ jobs:
           pyinstaller --name ACCF-Patcher --windowed --noconfirm \
             --collect-all tkinterdnd2 \
             --paths gcpad --paths tools/weather --add-data gcpad/patches.json:gcpad \
+            --add-data tools/weather/weather_patches.json:. \
             $BINS --distpath pyinst_dist tools/gui.py
           cp wit-gpl-2.0.txt pyinst_dist/ACCF-Patcher/
           cd pyinst_dist
@@ -112,6 +114,7 @@ jobs:
           pyinstaller --name ACCF-Patcher --windowed --noconfirm \
             --collect-all tkinterdnd2 \
             --paths gcpad --paths tools/weather --add-data "gcpad/patches.json;gcpad" \
+            --add-data "tools/weather/weather_patches.json;." \
             --icon assets/icon.ico \
             $BINS --distpath pyinst_dist tools/gui.py
           cp wit-gpl-2.0.txt pyinst_dist/ACCF-Patcher/
