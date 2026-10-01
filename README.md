@@ -1,51 +1,99 @@
 # ACCF-SDHC
 
-SDHC (>2 GB) SD card support for *Animal Crossing: City Folk* on Wii.
+A patcher for *Animal Crossing: City Folk* (Wii) that adds three optional extras:
 
-Ported from **SDHC Extension 1.1 [Bero]** by way of *My Pokémon Ranch*.
+- **SDHC card support**: save in-game photos to SD cards larger than 2 GB.
+- **GameCube controller support**: play with a GameCube pad in port 1, no Wii Remote needed.
+- **Forecast Channel weather**: your town gets the real 7-day weather for your console's location.
 
-## Quick start
+Works with every retail region and revision, plus City Folk Deluxe. SDHC support is ported from
+**SDHC Extension 1.1 [Bero]** by way of *My Pokémon Ranch*.
 
-The patcher has three independent checkboxes: **SDHC card support**, **GameCube controller** (port 1) and **Forecast Channel weather**,
-all on by default. Untick what you don't want, drop the disc.
+## What you need
 
-1. **Download** `ACCF-Patch` for your platform from
-   [Releases](https://github.com/quatric/ACCF-SDHC/releases).
-2. **Drop your `.wbfs`/`.iso` on the window.** It reads the disc's own ID and
-   revision, applies the matching patch, and rebuilds the image in place. The
-   original is kept as `<name>.bak`.
-3. **Play.**
+- A dump of your own game as a `.wbfs` or `.iso`. No game files are included here.
+- A Wii (or Dolphin) that can run it from a USB loader or SD card.
+- **IOS**: when launching from a USB loader, set **IOS to 249** and **Block IOS Reload** to **On**.
+  The disc's stock IOS 38 can't initialize SDHC cards, so the patched game depends on this.
+  (Korean discs use IOS 48 but already support SDHC.)
+- **For SDHC**: an SD card formatted **FAT32**.
+- **For the controller**: a GameCube controller in **port 1**. The HOME Menu still needs a Wii Remote, since a GameCube pad has no HOME button.
+- **For weather**: the **Forecast Channel** installed on your Wii, with WiiConnect24 forecast data already downloaded (open the Forecast Channel once while online).
+  Without that data the game simply keeps its normal weather.
+- **To run the patcher**: nothing else. It bundles everything it needs. (Running from source needs Python 3, [Wiimms ISO Tool](https://wit.wiimm.de/) and, optionally, `tkinterdnd2`.)
 
-That's the whole thing. The patcher will refuse a disc it doesn't recognize
-rather than guess, so it cannot apply the wrong revision's addresses.
+## How to use it
 
-If you'd rather install by hand — Gecko code, Riivolution XML, or a prebuilt
-`main.dol` — **check your disc first**:
+1. **Download** `ACCF-Patch` for your platform (macOS, Windows or Linux) from [Releases](https://github.com/quatric/ACCF-SDHC/releases).
+   The apps are unsigned, so your OS will warn you. On macOS, right-click the app and choose Open.
+2. **Drop your `.wbfs` or `.iso` on the window.** The three options (SDHC, GameCube controller, weather) are all ticked by default. Untick any you don't want.
+3. **Wait for "done: patched in place".** The patcher reads the disc's own ID and revision and applies the matching patch. Your original is kept as `<name>.bak`. Keep it: the patch can't be undone in place.
+4. **Copy the image back** to your USB drive or SD card and play.
+
+The patcher refuses a disc it doesn't recognize rather than guess, so it can't apply the wrong revision's addresses.
+
+### Turning weather off
+
+Hold **B** (Wii Remote or Classic Controller) while the game boots, **before the title screen**, to disable the Forecast Channel weather for that session.
+
+### Korean discs
+
+`RUUK01` and `RUUK02` already support SDHC cards. Don't SDHC-patch them. Only the controller and weather options apply.
+
+## Supported discs
+
+| File       | Disc ID  | Rev | Version                                       |
+|------------|----------|-----|-----------------------------------------------|
+| `RUUE01v0` | `RUUE01` | 0   | City Folk (USA)                               |
+| `RUUE01v1` | `RUUE01` | 1   | City Folk (USA/Asia)                          |
+| `RUUJ01v1` | `RUUJ01` | 1   | Machi e Ikou yo: Doubutsu no Mori (Japan)     |
+| `RUUJ01v2` | `RUUJ01` | 2   | Machi e Ikou yo: Doubutsu no Mori (Japan)     |
+| `RUUP01v0` | `RUUP01` | 0   | Let's Go to the City (Europe)                 |
+| `RUUP01v1` | `RUUP01` | 1   | Let's Go to the City (Europe)                 |
+| `RUUE02`   | `RUUE02` | 0   | City Folk **Deluxe** (USA)                    |
+| `RUUJ02`   | `RUUJ02` | 1   | City Folk **Deluxe** (Japan)                  |
+| `RUUP02`   | `RUUP02` | 0   | City Folk **Deluxe** (PAL)                    |
+
+## Installing by hand (no patcher)
+
+If you'd rather not run an unsigned app, each feature is also available as a Gecko code or Riivolution XML:
+`ACCF-Patch-SDHC-Gecko-Codes.zip`, `ACCF-Patch-SDHC-Riivolution.zip` and `ACCF-Patch-GameCube-Controller-Gecko-Codes.zip` on the Releases page.
+Gecko codes need a code handler.
+
+**Check your disc first.** Several disc IDs cover two revisions that need different addresses, and the wrong one crashes the game or breaks card detection.
+Files are named for the revision (`RUUE01v0`, not `RUUE01`); never rename them.
 
 ```sh
 python3 tools/identify.py "Animal Crossing - City Folk (USA).wbfs"
 ```
 
-It prints the disc ID, the revision, the exact `gecko/` and `riivolution/`
-filenames that belong to it, and whether the disc is still unpatched. This
-matters: nothing in the Gecko or Riivolution formats stops you applying Rev 1
-addresses to a Rev 0 disc, and doing so silently breaks SDHC detection (the
-card comes up as an unknown device) or crashes the title. See
-[Revision matters](#️-revision-matters--check-yours-first).
+It prints the disc ID, revision, the exact filenames that belong to it, and whether the disc is already patched.
+Riivolution XMLs check the revision themselves; Gecko codes can't, so choosing the right file is on you.
+If you applied the wrong one, restore from your `.bak` (or re-dump) and start over.
 
-## GameCube controller (optional)
+## More about each feature
 
-Play with a GameCube controller in **port 1** — no Wii Remote needed. The pad
-reaches the game as a Classic Controller, so it runs on Vague Rant's Classic
-Controller support, with the pointer on the C-stick. Tick *GameCube controller* in the patcher, or use the per-revision Gecko codes in
-[`gcpad/gecko/`](gcpad/). Controls, how it works and what has (and hasn't)
-been tested are in [`gcpad/README.md`](gcpad/README.md).
+- GameCube controller: [`gcpad/README.md`](gcpad/README.md) (controls, how it works, what was tested)
+- Weather: [`tools/weather/README.md`](tools/weather/README.md)
 
-## Forecast Channel weather (optional)
+## Help
 
-Replaces the town's weather with the Forecast Channel's 7-day data for the console's own location (the City keeps its own). Works on every revision;
-see [`tools/weather/README.md`](tools/weather/README.md). The patch data ships with the patcher (`tools/weather/weather_patches.json`);
-rebuilding it needs a Mario & Sonic Winter Olympics disc.
+General questions can go to [quatricsoftware@gmail.com](mailto:quatricsoftware@gmail.com). No support will be provided for this tool.
+
+## Credits
+
+- **Bero**: original *SDHC Extension 1.1*, which this is a port of
+- Wiimm: [wit / Wiimms ISO Tools](https://wit.wiimm.de/)
+
+## License
+
+Copyright (c) 2026 quatric
+
+---
+
+# Technical details
+
+Everything below is for people who want to know how the patch works or to build and verify it themselves.
 
 ## What it does
 
@@ -62,7 +110,7 @@ The patch adds three things:
 
 It touches only the SD driver.
 
-## Supported discs
+## Patch sites per disc
 
 | File       | Disc ID  | Rev | Version                                       | Rebase   |
 |------------|----------|-----|-----------------------------------------------|----------|
@@ -214,7 +262,7 @@ Nine of the ten sites are byte-identical to the *My Pokémon Ranch* originals, s
 Bero's register assumptions carry over unchanged. The tenth (hook4) differs only
 in its r13 SDA offset.
 
-## IOS requirement
+## IOS requirement (technical)
 
 The stock TMD requests **IOS 38**, whose SDIO module does not take the SDv2
 initialization path. This is why the card can report CCS/SDHC while remaining
@@ -250,18 +298,3 @@ some build this port doesn't know about.
 GDB stub (`GDBPort` in `Dolphin.ini`, launch with `-d`). The stub accepts one
 client per run, so it does halt → resume → interrupt → verify in a single
 connection.
-
-## Credits
-
-- **Bero** — original *SDHC Extension 1.1*, which this is a port of
-- Wiimm — [wit / Wiimms ISO Tools](https://wit.wiimm.de/)
-
-## Contact
-
-General questions or comments can be sent to
-[quatricsoftware@gmail.com](mailto:quatricsoftware@gmail.com). No support will be provided
-for this tool.
-
-## License
-
-Copyright (c) 2026 quatric
