@@ -187,8 +187,8 @@ of the fuller set Mobipeg targets. Each bundles the matching `wit` build
 (GPLv2; `wit-gpl-2.0.txt` ships alongside it) so nothing else needs to be
 installed. Every run (and additionally as release assets on a `v*` tag push)
 publishes `ACCF-Patcher-<target>.*` for each platform, plus two separate,
-platform-independent archives: `ACCF-SDHC-Gecko-Codes.zip` (`gecko/*.txt`) and
-`ACCF-SDHC-Riivolution.zip` (`riivolution/*.xml`). Both keep the per-revision
+platform-independent archives: `ACCF-Patch-SDHC-Gecko-Codes.zip` (`gecko/*.txt`) and
+`ACCF-Patch-SDHC-Riivolution.zip` (`riivolution/*.xml`). Both keep the per-revision
 filenames. The Gecko codes need a code handler and manual address-matching per
 disc revision, but don't need a source dump, `wit`, or the GUI at all -- they're
 a no-tooling fallback for anyone who'd rather not run an unsigned downloaded app,

@@ -141,32 +141,32 @@ jobs:
       # other's disc, so the names are load-bearing, not cosmetic.
       - name: Zip Gecko codes
         run: |
-          zip -qr ACCF-SDHC-Gecko-Codes.zip gecko
-          (cd gcpad && zip -qr ../ACCF-SDHC-GameCube-Controller-Gecko-Codes.zip gecko)
+          zip -qr ACCF-Patch-SDHC-Gecko-Codes.zip gecko
+          (cd gcpad && zip -qr ../ACCF-Patch-GameCube-Controller-Gecko-Codes.zip gecko)
 
       - name: Zip Riivolution patches
-        run: zip -qr ACCF-SDHC-Riivolution.zip riivolution
+        run: zip -qr ACCF-Patch-SDHC-Riivolution.zip riivolution
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ACCF-SDHC-Gecko-Codes
-          path: ACCF-SDHC-Gecko-Codes.zip
+          name: ACCF-Patch-SDHC-Gecko-Codes
+          path: ACCF-Patch-SDHC-Gecko-Codes.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ACCF-SDHC-Riivolution
-          path: ACCF-SDHC-Riivolution.zip
+          name: ACCF-Patch-SDHC-Riivolution
+          path: ACCF-Patch-SDHC-Riivolution.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ACCF-SDHC-GameCube-Controller-Gecko-Codes
-          path: ACCF-SDHC-GameCube-Controller-Gecko-Codes.zip
+          name: ACCF-Patch-GameCube-Controller-Gecko-Codes
+          path: ACCF-Patch-GameCube-Controller-Gecko-Codes.zip
 
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ACCF-SDHC-Gecko-Codes.zip
-            ACCF-SDHC-Riivolution.zip
-            ACCF-SDHC-GameCube-Controller-Gecko-Codes.zip
+            ACCF-Patch-SDHC-Gecko-Codes.zip
+            ACCF-Patch-SDHC-Riivolution.zip
+            ACCF-Patch-GameCube-Controller-Gecko-Codes.zip
