@@ -79,13 +79,19 @@ def key_for(disc_id, disc_ver):
     return None, None, None
 
 
+# Korea's discs already support SDHC, so only the controller and weather options apply to them
+# (matched on the disc id alone: the version byte in their partition header reads 0 whichever revision this is)
+KOREA = {'RUUK01': ('RUUK01v1', 'Tauneuro Nolleogayo: Dongmurui Sup (Korea, Rev 1)'),
+         'RUUK02': ('RUUK02', 'Animal Crossing: City Folk Deluxe (Korea)')}
+
+
 def gcpad_dir():
     if getattr(sys, 'frozen', False):
         return os.path.join(getattr(sys, '_MEIPASS', os.path.dirname(sys.executable)), 'gcpad')
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'gcpad')
 
 
-def run_patch(image_path, log, done, gc=False, weather=False):
+def run_patch(image_path, log, done, sdhc=True, gc=False, weather=False):
     try:
         wit = find_wit()
         if wit is None:
@@ -107,7 +113,14 @@ def run_patch(image_path, log, done, gc=False, weather=False):
             if not got:
                 raise RuntimeError('could not read sys/boot.bin from the extracted disc')
             disc_id, disc_ver = got
+            if not (sdhc or gc or weather):
+                raise RuntimeError('nothing selected: tick at least one patch')
             key, label, delta = key_for(disc_id, disc_ver)
+            if not key and disc_id in KOREA:
+                if sdhc:
+                    raise RuntimeError('Korean discs already support SDHC cards; untick the SDHC patch '
+                                       'to add the controller or weather patch.')
+                key, label = KOREA[disc_id]
             if not key:
                 raise RuntimeError(
                     '%s v%d is not a supported target.\n\n'
@@ -121,21 +134,25 @@ def run_patch(image_path, log, done, gc=False, weather=False):
                 raise RuntimeError('could not find sys/main.dol in the extracted disc')
 
             d = Dol(dol_path)
-            bad = dist.verify_target(d, delta)
+            bad = dist.verify_target(d, delta) if sdhc else None
             if bad:
                 raise RuntimeError(
                     'disc does not match the expected site map: %s\n'
                     'Already patched, or an unexpected build of the game -- not patching it.'
                     % ', '.join(bad))
 
-            patches, _cave_end = dist.rebased_patches(delta)
-            data = bytearray(d.data)
-            for va, blob in patches:
-                fo = d.v2f(va)
-                if fo is None:
-                    raise RuntimeError('unmapped patch address 0x%08X' % va)
-                data[fo:fo + len(blob)] = blob
-            data = bytes(data)
+            data = d.data
+            patches = []
+            if sdhc:
+                patches, _cave_end = dist.rebased_patches(delta)
+                data = bytearray(d.data)
+                for va, blob in patches:
+                    fo = d.v2f(va)
+                    if fo is None:
+                        raise RuntimeError('unmapped patch address 0x%08X' % va)
+                    data[fo:fo + len(blob)] = blob
+                data = bytes(data)
+                log('  added SDHC card support')
             if gc:
                 data = patch_dol.apply(data, patch_dol.load(key, root=gcpad_dir()))
                 log('  added GameCube controller (port 1) support')
@@ -143,7 +160,7 @@ def run_patch(image_path, log, done, gc=False, weather=False):
                 data = apply_weather.apply(data, key)
                 log('  added Forecast Channel weather')
             open(dol_path, 'wb').write(data)
-            log('  patched main.dol (%d writes)' % len(patches))
+            log('  patched main.dol')
 
             staged = os.path.join(tmp, 'patched.img')
             log('rebuilding...')
@@ -173,8 +190,8 @@ BASE = TkinterDnD.Tk if HAVE_DND else tk.Tk
 class App(BASE):
     def __init__(self):
         super().__init__()
-        self.title('ACCF SDHC Patcher')
-        self.geometry('560x420')
+        self.title('ACCF Patcher')
+        self.geometry('600x500')
         self.msgq = queue.Queue()
         self.busy = False
 
@@ -189,14 +206,19 @@ class App(BASE):
             self.drop.drop_target_register(DND_FILES)
             self.drop.dnd_bind('<<Drop>>', self.on_drop)
 
+        opts = tk.LabelFrame(self, text='Patches')
+        opts.pack(fill='x', padx=10)
+        self.sdhc = tk.BooleanVar(value=True)
+        tk.Checkbutton(opts, text='SDHC card support (cards over 2 GB)',
+                       variable=self.sdhc).pack(anchor='w')
         self.gc = tk.BooleanVar(value=False)
-        tk.Checkbutton(self, text='Also add GameCube controller support (port 1)',
-                       variable=self.gc).pack()
+        tk.Checkbutton(opts, text='GameCube controller in port 1 (as a Classic Controller)',
+                       variable=self.gc).pack(anchor='w')
 
         self.weather = tk.BooleanVar(value=False)
-        wcb = tk.Checkbutton(self, text='Also add Forecast Channel weather (needs weather_patches.json)',
+        wcb = tk.Checkbutton(opts, text='Forecast Channel weather (needs weather_patches.json, see tools/weather)',
                              variable=self.weather)
-        wcb.pack()
+        wcb.pack(anchor='w')
         if not apply_weather.available():
             wcb.configure(state='disabled')
 
@@ -264,7 +286,7 @@ class App(BASE):
             args=(image_path,
                   lambda t: self.msgq.put(('log', t)),
                   lambda ok, m: self.msgq.put(('done', (ok, m))),
-                  self.gc.get(), self.weather.get()),
+                  self.sdhc.get(), self.gc.get(), self.weather.get()),
             daemon=True,
         ).start()
 

@@ -36,7 +36,7 @@ REVS = {
     "RUUE02": ("RUUE02", 0, "Animal Crossing: City Folk Deluxe (USA)"),
     "RUUP02": ("RUUP02", 0, "Animal Crossing: City Folk Deluxe (PAL)"),
     "RUUJ02": ("RUUJ02", 1, "Animal Crossing: City Folk Deluxe (Japan)"),
-    "RUUK02": ("RUUK02", 0, "Animal Crossing: City Folk Deluxe (Korea)"),
+    "RUUK02": ("RUUK02", 1, "Animal Crossing: City Folk Deluxe (Korea)"),
 }
 
 

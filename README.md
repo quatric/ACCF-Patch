@@ -6,6 +6,9 @@ Ported from **SDHC Extension 1.1 [Bero]** by way of *My Pokémon Ranch*.
 
 ## Quick start
 
+The patcher has three independent checkboxes: **SDHC card support** (on by default), **GameCube controller** (port 1) and **Forecast Channel weather**
+(the last needs a one-time local build, see below). Tick what you want, drop the disc.
+
 1. **Download** `ACCF-SDHC-Patcher` for your platform from
    [Releases](https://github.com/quatric/ACCF-SDHC/releases).
 2. **Drop your `.wbfs`/`.iso` on the window.** It reads the disc's own ID and
@@ -34,15 +37,14 @@ card comes up as an unknown device) or crashes the title. See
 
 Play with a GameCube controller in **port 1** — no Wii Remote needed. The pad
 reaches the game as a Classic Controller, so it runs on Vague Rant's Classic
-Controller support, with the pointer on the C-stick. Tick *Also add GameCube
-controller support* in the patcher, or use the per-revision Gecko codes in
+Controller support, with the pointer on the C-stick. Tick *GameCube controller* in the patcher, or use the per-revision Gecko codes in
 [`gcpad/gecko/`](gcpad/). Controls, how it works and what has (and hasn't)
 been tested are in [`gcpad/README.md`](gcpad/README.md).
 
 ## Forecast Channel weather (optional)
 
 Replaces the town's weather with the Forecast Channel's 7-day data for the console's own location (the City keeps its own). Works on every revision;
-see [`tools/weather/README.md`](tools/weather/README.md). It needs a Mario & Sonic Winter Olympics disc to build, so the patcher option only lights up
+see [`tools/weather/README.md`](tools/weather/README.md). It needs a Mario & Sonic Winter Olympics disc to build, so its patcher checkbox only lights up
 after you've run `tools/weather/build_all.py` once.
 
 ## What it does
