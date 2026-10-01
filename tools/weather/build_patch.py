@@ -25,14 +25,14 @@ def run(cmd):
     subprocess.check_call(cmd)
 
 
-def build_blob(donor, out, base=BASE):
+def build_blob(donor, out, base=BASE, trace=False, selftest=False):
     os.makedirs(out, exist_ok=True)
-    src, info = fcdgen.generate(donor)
+    src, info = fcdgen.generate(donor, trace=trace)
     asm = os.path.join(out, "fcd_relocated.S")
     open(asm, "w").write(src)
     obj = lambda n: os.path.join(out, n)
     for c in ("weather", "fcd_fetch", "fcd_loader"):
-        run([GCC] + CFLAGS + ["-c", os.path.join(HERE, c + ".c"), "-o", obj(c + ".o")])
+        run([GCC] + CFLAGS + (["-DWEATHER_SELFTEST"] if selftest and c == "weather" else []) + ["-c", os.path.join(HERE, c + ".c"), "-o", obj(c + ".o")])
     run([GCC, "-mcpu=750", "-Wa,-mregnames", "-c", os.path.join(HERE, "hooks.S"), "-o", obj("hooks.o")])
     run([GCC, "-mcpu=750", "-Wa,-mregnames", "-c", asm, "-o", obj("fcd_relocated.o")])
     elf = obj("weather.elf")
@@ -98,7 +98,7 @@ def verify_data_refs(blob, base, syms, info):
         x = words[k]
         op, rt, ra = x >> 26, (x >> 21) & 31, (x >> 16) & 31
         reg = rt if op == 24 else ra
-        for b in range(k - 1, max(k - 16, -1), -1):
+        for b in range(k - 1, max(k - 400, -1), -1):
             y = words[b]
             if (y >> 26) == 15 and ((y >> 21) & 31) == reg and ((y >> 16) & 31) == 0:
                 hi = (y & 0xFFFF) << 16
@@ -223,8 +223,10 @@ def main():
     ap.add_argument("--accf", required=True)
     ap.add_argument("--donor", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--selftest", action="store_true", help="test build: fetch once at the title (never ship)")
+    ap.add_argument("--trace", action="store_true", help="record FCDInit call results in fcd_trace (diagnostics)")
     a = ap.parse_args()
-    blob, syms, info = build_blob(a.donor, a.out)
+    blob, syms, info = build_blob(a.donor, a.out, trace=a.trace, selftest=a.selftest)
     checked, bad = verify_transplant(blob, BASE, syms, info)
     print("blob: %#x bytes at %#010x (ends %#010x)" % (len(blob), BASE, BASE + len(blob)))
     print("transplant check: %d branches verified, %d problems" % (checked, len(bad)))
@@ -242,7 +244,8 @@ def main():
     open(os.path.join(a.out, "RUUE02-weather.xml"), "w").write(riivolution_xml(patches))
     json.dump({"base": BASE, "blob_end": syms["weather_blob_end"],
                "patches": [{"address": va, "bytes": d.hex()} for va, d in patches if va != BASE],
-               "symbols": {k: v for k, v in syms.items() if k.startswith(("tramp_", "FCD", "fcd_", "weather_", "g_", "out."))}},
+               "symbols": {k: v for k, v in syms.items() if k.startswith(("tramp_", "FCD", "fcd_", "weather_", "g_", "out."))},
+               "trace_names": info.get("trace_names", [])},
               open(os.path.join(a.out, "weather-patch.json"), "w"), indent=1)
     print("patches: %d memory writes + blob; wrote main.weather.dol, RUUE02-weather.xml, weather-patch.json" % (len(patches) - 1))
     for va, d in patches:

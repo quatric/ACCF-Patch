@@ -27,9 +27,9 @@ def check(cond, msg):
     return cond
 
 
-def main():
-    disc, build = sys.argv[1], sys.argv[2]
-    secs = float(sys.argv[3]) if len(sys.argv) > 3 else 60
+def start(disc, build):
+    """Prepare the isolated Dolphin user folder, launch the game and connect the GDB stub.
+    Returns (proc, gdb, info, blob, sym)."""
     info = json.load(open(os.path.join(build, "weather-patch.json")))
     blob = open(os.path.join(build, "weather.bin"), "rb").read()
     sym = info["symbols"]
@@ -37,9 +37,52 @@ def main():
     shutil.rmtree(user, ignore_errors=True)
     os.makedirs(os.path.join(user, "Config"))
     ini = ("[General]\nGDBPort = %d\n[Interface]\nConfirmStop = False\nUsePanicHandlers = False\n"
-           "[Core]\nMMU = True\nCPUThread = False\nCPUCore = 4\nWiimoteContinuousScanning = False\n"
-           "WiimoteControllerInterface = False\nEnableWiiLink = False\n[Analytics]\nPermissionAsked = True\nEnabled = False\n" % PORT)
+           "[Core]\nMMU = True\nCPUThread = False\nCPUCore = 4\nEnableDebugging = True\nWiimoteContinuousScanning = False\n"
+           "WiimoteControllerInterface = False\nEnableWiiLink = %s\n[Analytics]\nPermissionAsked = True\nEnabled = False\n" % (PORT, "True" if os.environ.get("WC24") else "False"))
+    if os.environ.get("USER_INI"):
+        # start from the user's real settings; add the GDB stub, drop the bits that would prompt or touch hardware
+        real = open(os.path.expanduser("~/Library/Application Support/Dolphin/Config/Dolphin.ini")).read()
+        real = real.replace("[General]\n", "[General]\nGDBPort = %d\n" % PORT, 1).replace("[Core]\n", "[Core]\nEnableDebugging = True\n", 1)
+        for k in ("WiimoteContinuousScanning", "WiimoteControllerInterface", "WiiSDCard"):
+            real = "\n".join(("%s = False" % k) if ln.startswith(k + " =") else ln for ln in real.split("\n"))
+        if not os.environ.get("WC24"):
+            real = "\n".join("EnableWiiLink = False" if ln.startswith("EnableWiiLink =") else ln for ln in real.split("\n"))
+        ini = real
     open(os.path.join(user, "Config", "Dolphin.ini"), "w").write(ini)
+    if os.environ.get("IOS_LOG"):
+        open(os.path.join(user, "Config", "Logger.ini"), "w").write(
+            "[Logs]\nIOS_FS = True\nIOS = True\nIOS_WC24 = True\nIOS_NET = True\nIOS_SSL = True\nOSREPORT = True\nOSREPORT_HLE = True\n[Options]\nVerbosity = 5\nWriteToFile = True\nWriteToConsole = False\n")
+    wii_src = os.path.expanduser("~/Library/Application Support/Dolphin/Wii")
+    if os.environ.get("MIN_NAND") and os.path.isdir(wii_src):
+        # only the pieces the game and the forecast need: system settings, WiiConnect24 folder, forecast title data
+        for rel in ("shared2/sys", "shared2/wc24", "title/00000001/00000002/data", "title/00010002/48414645"):
+            srcp = os.path.join(wii_src, rel)
+            if os.path.exists(srcp):
+                os.makedirs(os.path.join(user, "Wii", rel), exist_ok=True)
+                subprocess.check_call(["rsync", "-a", "--exclude=.DS_Store", srcp.rstrip("/") + "/", os.path.join(user, "Wii", rel) + "/"])
+        print("copied a minimal NAND subset from", wii_src)
+    if os.environ.get("FULL_NAND") and os.path.isdir(wii_src):
+        # mirror the user's NAND (WiiConnect24 setup, SYSCONF, saves); read-only copy, no virtual SD card
+        subprocess.check_call(["rsync", "-a", "--exclude=sd.raw", "--exclude=tmp", "--exclude=.DS_Store", wii_src + "/", os.path.join(user, "Wii") + "/"])
+        print("mirrored the NAND from", wii_src)
+    save_src = os.environ.get("SAVE_DIR")
+    if save_src:
+        # a raw Wii save folder (BANNER.BIN, RVFOREST.DAT, ...): the game opens lowercase names
+        dst = os.path.join(user, "Wii", "title", "00010000", "52555545", "data")
+        shutil.rmtree(dst, ignore_errors=True)
+        os.makedirs(dst)
+        for f in os.listdir(save_src):
+            shutil.copy(os.path.join(save_src, f), os.path.join(dst, f.lower()))
+        print("installed save:", sorted(f.lower() for f in os.listdir(dst)))
+    src_nand = os.path.expanduser("~/Library/Application Support/Dolphin/Wii/title/00010002")
+    for tid in ("4841464a", "48414645", "48414650"):
+        for rel in ("data/wc24dl.vff", "data/noerase/savedata.dat"):
+            f = os.path.join(src_nand, tid, rel)
+            if os.path.exists(f):
+                dst = os.path.join(user, "Wii", "title", "00010002", tid, rel)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.copy(f, dst)
+                print("copied forecast data:", tid, rel, os.path.getsize(f), "bytes")
     cmd = [DOLPHIN, "-b", "-u", user, "-e", disc, "-v", "Null"]
     print("launching:", " ".join(cmd))
     subprocess.check_call(["open", "-n", "-a", "/Applications/Dolphin.app", "--args"] + cmd[1:])
@@ -68,20 +111,28 @@ def main():
                 os.kill(p, 9)
         returncode = "?"
     proc = _Proc()
+    g = None
+    for _ in range(120):
+        try:
+            g = Gdb(timeout=30)
+            break
+        except OSError:
+            if proc.poll() is not None:
+                print("Dolphin exited early (code %s)" % proc.returncode)
+                raise SystemExit(2)
+            time.sleep(1)
+    if g is None:
+        proc.kill()
+        print("could not reach the GDB stub")
+        raise SystemExit(2)
+    return proc, g, info, blob, sym
+
+
+def main():
+    disc, build = sys.argv[1], sys.argv[2]
+    secs = float(sys.argv[3]) if len(sys.argv) > 3 else 60
+    proc, g, info, blob, sym = start(disc, build)
     try:
-        g = None
-        for _ in range(120):
-            try:
-                g = Gdb(timeout=30)
-                break
-            except OSError:
-                if proc.poll() is not None:
-                    print("Dolphin exited early (code %s)" % proc.returncode)
-                    return 2
-                time.sleep(1)
-        if g is None:
-            print("could not reach the GDB stub")
-            return 2
         print("stop reply:", g.cmd("?"))
         disc_id = g.read_mem(0x80000000, 6).decode("ascii", "replace")
         check(disc_id == "RUUE02", "disc id is %r" % disc_id)
@@ -118,19 +169,65 @@ def main():
         title, off_latch = g.read_mem(sym["g_titleReached"], 1)[0], g.read_mem(sym["g_off"], 1)[0]
         last_try = struct.unpack(">i", g.read_mem(sym["g_lastTryDay"], 4))[0]
         n_days = rd32("g_cache", 4)
+        base_day = struct.unpack(">i", g.read_mem(sym["g_cache"], 4))[0]
+        types = list(g.read_mem(sym["g_cache"] + 8, 7))
         raw = rd32("fcd_ctx", 0x18)
         flag = rd32("fcd_flag")
         print("  g_titleReached = %d, g_off = %d, g_lastTryDay = %d, cached days = %d" % (title, off_latch, last_try, n_days))
         print("  fcd_ctx.raw = %#010x (work buffer), fcd_flag = %d" % (raw, flag))
+        if "g_fetch_status" in sym:
+            st = struct.unpack(">5i", g.read_mem(sym["g_fetch_status"], 20))
+            print("  fetch status: lock=%d FCDInit=%d ownAreaId=%#x getOwnId=%d firstForecast=%d  (99 = not reached)" % st)
+        r13 = 0x807516C0
+        kind = g.read_mem(r13 - 0x6384, 1)[0]
+        table = struct.unpack(">68I", g.read_mem(0x80479BE0, 68 * 4))
+        flags = table[kind] if kind < 0x44 else 0
+        print("  current scene kind %#04x, flags %#010x -> %s" % (kind, flags, "CITY: weather not overridden" if flags & 0x200 else "not the City: forecast applies"))
+        check(table[0x27] == 0x10001290 and table[1] == 0x01000450, "scene flag table at 0x80479be0 is the one the hook reads")
+        vf_count = struct.unpack(">I", g.read_mem(r13 - 0x1B48, 4))[0]
+        vf_base = struct.unpack(">I", g.read_mem(r13 - 0x1B38, 4))[0]
+        print("  City Folk VF library: drive slots = %d, slot table at %#010x (0 = VFInit has not run)" % (vf_count, vf_base))
+        if "fcd_trace" in sym and info.get("trace_names"):
+            vals = struct.unpack(">%di" % len(info["trace_names"]), g.read_mem(sym["fcd_trace"], 4 * len(info["trace_names"])))
+            print("  FCDInit call results (0 = never executed):")
+            for nm, v in zip(info["trace_names"], vals):
+                print("    %-34s -> %d" % (nm, v))
+        ctx = g.read_mem(sym["fcd_ctx"], 0x20)
+        print("  FCD context words:", " ".join("%08x" % struct.unpack(">I", ctx[i:i + 4])[0] for i in range(0, 0x20, 4)))
+        c_fsz, c_ssz, c_tmp = struct.unpack(">I", ctx[4:8])[0], struct.unpack(">I", ctx[0xC:0x10])[0], struct.unpack(">I", ctx[0x14:0x18])[0]
+        print("  FCD context: forecast size recorded = %d (0x%x), short size recorded = %d (0x%x), chunk buffer %#010x" % (c_fsz, c_fsz, c_ssz, c_ssz, c_tmp))
+        if 0x80000000 <= c_tmp < 0x94000000:
+            hdr = g.read_mem(c_tmp, 16)
+            sz = hdr[1] | hdr[2] << 8 | hdr[3] << 16
+            print("  last file read (chunk head): %s  -> type byte %#04x, claims %d (%#x) bytes decompressed (limit for short.bin is 0x5000)" % (hdr.hex(), hdr[0], sz, sz))
         check(title == 1, "a weather hook ran and closed the B window (title reached)")
         check(off_latch == 0, "B latch not set (nothing was held)")
-        if last_try != 0:
+        if n_days > 0:
+            names = ["clear", "mild overcast", "heavy overcast", "rain", "heavy rain", "snow", "heavy snow"]
+            print("  cache base game day %d, %d days:" % (base_day, n_days))
+            raw_codes = struct.unpack(">%dH" % n_days, g.read_mem(sym["g_codes"], 2 * n_days)) if "g_codes" in sym else [0] * n_days
+            cond = {}
+            xml = os.environ.get("WEATHER_XML")
+            if xml and os.path.exists(xml):
+                import xml.etree.ElementTree as ET
+                for c in ET.parse(xml).getroot().iter("condition"):
+                    nm = c.find("name").get("eng").replace("\n", " ")
+                    for tag in ("code_2", "japanese_code_2"):
+                        cond.setdefault(int((c.findtext(tag) or "0").strip(), 16), set()).add(nm)
+            for i in range(n_days):
+                tname = names[types[i]] if types[i] < 7 else "unknown -> vanilla"
+                what = "/".join(sorted(cond.get(raw_codes[i], []))) or "?"
+                print("    day +%d (game day %d): code %#06x (%s)  ->  type %d  %s" % (i, base_day + i, raw_codes[i], what, types[i], tname))
+            check(base_day == last_try, "cache is anchored on today's game day")
+            check(all(x < 7 or x == 0xFF for x in types[:n_days]), "every cached type is a valid City Folk weather type")
+            check(n_days >= 1, "forecast read through the transplanted FCD: %d day(s) cached" % n_days)
+        elif last_try != 0:
             # the game day number is days since 1970; 2009-2036 is 14000..24000
             check(10000 < last_try < 40000, "a fetch was attempted for a sane game day (%d)" % last_try)
             check(0x90000000 <= raw < 0x94000000, "FCDInit got a work buffer from the NWC24 heap in MEM2 (%#010x)" % raw)
             check(flag == 0 and n_days == 0, "fetch found no Forecast Channel data here, so vanilla weather stays (flag 0, 0 cached days)")
-        else:
-            print("  (no fetch attempted in this window)")
+        if last_try != 0 and n_days > 0:
+            check(0x90000000 <= raw < 0x94000000, "FCDInit got a work buffer from the NWC24 heap in MEM2 (%#010x)" % raw)
         print("\nFAILED" if fail else "\nall checks passed")
     finally:
         proc.terminate()

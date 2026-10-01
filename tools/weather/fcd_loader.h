@@ -13,9 +13,9 @@ typedef unsigned int   u32;
 typedef int            s32;
 typedef unsigned long long u64;
 
-/* FCDGetWorkMemorySize() is 0x3909C. City Folk gets a ~1.25x buffer for
- * forecast.bin (0x32000) + short.bin (0x5000) + savedata and the read chunk. */
-#define FCD_WORK_NEED   0x3909C
+/* FCDGetWorkMemorySize() is 0x3B89C here (0x3909C in the donor). City Folk allocates 0x48000 for
+ * forecast.bin (0x32000) + short.bin (0x7800) + savedata and the read chunk. */
+#define FCD_WORK_NEED   0x3B89C     /* donor 0x3909C + the larger short.bin region (see fcdgen.py) */
 #define FCD_WORK_ALLOC  0x48000
 #define FCD_CHUNK       0x2000
 
@@ -37,7 +37,9 @@ s32 fcd_load_lz(const char *path, u32 maxSize, void *dst, u32 *outSize);
 u32 fcd_crc32(const u8 *p, u32 len);
 
 /* Allocate/free the FCD work buffer from the NWC24 heap. */
-void *fcd_work_alloc(void);
+void *fcd_heap_alloc(u32 size);      /* 32-byte aligned, from the NWC24 heap; 0 on failure */
+void  fcd_heap_free(void *p);
+void *fcd_work_alloc(void);          /* FCD_WORK_ALLOC bytes */
 void  fcd_work_free(void *p);
 
 #endif

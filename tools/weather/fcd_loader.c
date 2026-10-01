@@ -140,29 +140,6 @@ s32 fcd_load_lz(const char *path, u32 maxSize, void *dst, u32 *outSize)
     return rc;
 }
 
-#ifndef FCD_HOST
-/* NWC24 heap: SDA -0x3284(r13); EGG heap vtable +0x14 alloc(size, align), +0x18 free(ptr) */
-typedef struct { void **vtbl; } EggHeap;
-register char *fcd_sda asm("r13");
-
-#define NWC24_HEAP (*(EggHeap **)(fcd_sda - 0x3284))
-
-void *fcd_work_alloc(void)
-{
-    EggHeap *h = NWC24_HEAP;
-    if (!h)
-        return 0;
-    return ((void *(*)(EggHeap *, u32, s32))h->vtbl[0x14 / 4])(h, FCD_WORK_ALLOC, 0x20);
-}
-
-void fcd_work_free(void *p)
-{
-    EggHeap *h = NWC24_HEAP;
-    if (h && p)
-        ((void (*)(EggHeap *, void *))h->vtbl[0x18 / 4])(h, p);
-}
-#endif
-
 /* donor 0x804417b0: CRC-32 (init 0xFFFFFFFF, final NOT), two table steps per byte */
 u32 fcd_crc32(const u8 *p, u32 len)
 {
@@ -175,3 +152,45 @@ u32 fcd_crc32(const u8 *p, u32 len)
     }
     return ~crc;
 }
+
+#ifndef FCD_HOST
+register char *fcd_sda asm("r13");
+
+/* current scene kind: u8 at SDA -0x6384(r13) (0x80162548); its flag word is table[kind] at 0x80479be0, 0x44 entries
+ * (0x80162524) */
+u32 weather_platform_scene_flags(void)
+{
+    u32 kind = *(u8 *)(fcd_sda - 0x6384);
+    return kind < 0x44 ? ((const u32 *)0x80479BE0)[kind] : 0;
+}
+
+/* NWC24 heap: SDA -0x3284(r13); EGG heap vtable +0x14 alloc(size, align), +0x18 free(ptr) */
+typedef struct { void **vtbl; } EggHeap;
+
+#define NWC24_HEAP (*(EggHeap **)(fcd_sda - 0x3284))
+
+void *fcd_heap_alloc(u32 size)
+{
+    EggHeap *h = NWC24_HEAP;
+    if (!h)
+        return 0;
+    return ((void *(*)(EggHeap *, u32, s32))h->vtbl[0x14 / 4])(h, size, 0x20);
+}
+
+void fcd_heap_free(void *p)
+{
+    EggHeap *h = NWC24_HEAP;
+    if (h && p)
+        ((void (*)(EggHeap *, void *))h->vtbl[0x18 / 4])(h, p);
+}
+
+void *fcd_work_alloc(void)
+{
+    return fcd_heap_alloc(FCD_WORK_ALLOC);
+}
+
+void fcd_work_free(void *p)
+{
+    fcd_heap_free(p);
+}
+#endif

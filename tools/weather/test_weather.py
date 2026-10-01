@@ -9,6 +9,7 @@ class Cal(ctypes.Structure):
 
 SHIM = r'''
 #include "weather.h"
+u32 g_scene = 0; u32 weather_platform_scene_flags(void) { return g_scene; }
 int g_calls; int g_ret; int g_lastBack; unsigned short g_codes[8];
 s32 weather_platform_fetch(const CalTime *d, s32 back, u16 *codes, s32 max) {
     int i; (void)d; g_calls++; g_lastBack = back;
@@ -88,13 +89,45 @@ def main():
         check("day 8 has no data -> -1", L.weather_type_for_date(ctypes.byref(cal(2009, 4, 18, 12))), -1)
         check("one failed fetch", calls(), 2)
         L.weather_type_for_date(ctypes.byref(cal(2009, 4, 18, 13)))
-        check("failed fetch not repeated the same day", calls(), 2)
+        check("a failed fetch is not retried immediately", calls(), 2)
+        for _ in range(250):
+            L.weather_type_for_date(ctypes.byref(cal(2009, 4, 18, 13)))
+        check("retried after the wait (2nd attempt)", calls(), 3)
+        for _ in range(250):
+            L.weather_type_for_date(ctypes.byref(cal(2009, 4, 18, 13)))
+        for _ in range(250):
+            L.weather_type_for_date(ctypes.byref(cal(2009, 4, 18, 13)))
+        check("gives up after 3 attempts on the same day", calls(), 4)
         L.weather_type_for_date(ctypes.byref(cal(2009, 4, 19, 12)))
-        check("retried next day", calls(), 3)
+        check("tries again immediately on the next day", calls(), 5)
+        for _ in range(250):
+            L.weather_type_for_date(ctypes.byref(cal(2009, 4, 19, 12)))
+        check("and retries after the wait", calls(), 6)
         # TV anchors the fetch one day back
         setup(week)
         L.weather_tv_for_date(ctypes.byref(cal(2009, 4, 11, 12)))
         check("tv fetch anchored back=1", back(), 1)
+        # platform not ready yet (VFInit has not run): vanilla, no attempt consumed, data used once ready
+        setup(week, ret=-1)
+        for _ in range(5):
+            r = L.weather_type_for_date(ctypes.byref(d0))
+        check("not ready -> vanilla on every call", r, -1)
+        check("not ready: asked again each call (no retry budget spent)", calls(), 5)
+        ctypes.c_int.in_dll(L, "g_ret").value = 7
+        check("ready -> forecast used immediately", L.weather_type_for_date(ctypes.byref(d0)), 0)
+        # the City keeps its own weather: never overridden, never even fetched
+        for flags, name, city in [(0x450, "town field", False), (0x850, "room", False), (0x4020, "bus", False),
+                                  (0x10000, "unknown bit", False), (0x1290, "City outdoors", True), (0x290, "City interior", True),
+                                  (0x80001290, "City outdoors (winter)", True)]:
+            setup(week)
+            ctypes.c_uint.in_dll(L, "g_scene").value = flags
+            ty = L.weather_type_for_date(ctypes.byref(d0)); tv = L.weather_tv_for_date(ctypes.byref(cal(2009, 4, 11, 12)))
+            if city:
+                check(f"{name} ({flags:#x}): type hook falls through", ty, -1)
+                check(f"{name}: tv hook falls through, no fetch", (tv, calls()), (-1, 0))
+            else:
+                check(f"{name} ({flags:#x}): forecast applies", ty, 0)
+        ctypes.c_uint.in_dll(L, "g_scene").value = 0
         # unknown code on one day only falls back for that day
         setup([0x0065, 0x1234, 0x006F])
         L.weather_type_for_date(ctypes.byref(cal(2009, 4, 10, 12)))     # anchors the cache on day 0

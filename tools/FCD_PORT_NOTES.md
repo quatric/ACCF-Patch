@@ -36,7 +36,7 @@ chunk temp buffer (0x2000) after. Total 0x3909C.
 
 | s.dol | role | ACCF | confidence |
 |---|---|---|---|
-| 0x80463b88 | VF mount drive | 0x80434e44 (0x80434cb8 is a near-identical sibling) | high |
+| 0x80463b88 | VF mount drive | 0x80434cb8 (the variant the game's NWC24 uses; 0x80434e44 is its twin) | exact (corrected, see below) |
 | 0x80463d14 | VF unmount | 0x80434fd0 | exact |
 | 0x80463df0 | VF open | 0x80435188 | high (slightly different body) |
 | 0x80463eb4 | VF close | 0x80435264 | exact |
@@ -278,8 +278,7 @@ is redirected to `tramp_arena`, which clamps the value to `weather_blob_end` (an
 
 FCD transplant (`fcdgen.py`). The donor FCD code (s.dol `0x80562950`-`0x8056481c`, 7.9 KB) is turned into relocatable assembly: branches become labels, everything
 else stays `.long`, and the references that cannot stay are rewritten. FCD_LoadLZ (`0x805633d8`) is replaced by `fcd_load_lz`; `0x804417b0` by `fcd_crc32`; the
-MW runtime helpers map by a constant offset (`donor - 0x1bd7a8`, the block is identical); `VFMount` is `0x80434e44` (the one whose helper thunk matches the
-donor with 0 mismatches; `0x80434cb8` is a different variant). FCD's own data (context struct, the two path tables, the init flag, three pointer variables
+MW runtime helpers map by a constant offset (`donor - 0x1bd7a8`, the block is identical); `VFMount` is `0x80434cb8` (the variant the game's own NWC24 code uses; `0x80434e44` is an identical-shaped twin that installs the other driver set). FCD's own data (context struct, the two path tables, the init flag, three pointer variables
 and two inline strings that lived in the donor's SDA) is emitted as our own data, and its 15 r13 accesses become absolute accesses through r12 (checked dead at each
 site). `build_patch.py` verifies the result: all 366 branches reach the same target as in the donor, and all 15 data-object and 15 SDA references compute the
 intended addresses.
@@ -310,3 +309,30 @@ Result on the patched game after 60 s of emulation (Dolphin 2609-7, RUUE02 revis
 
 Not yet exercised: the success path (valid `wc24dl.vff` with `forecast.bin`/`short.bin`), the B-held path with a real controller, and the TV hook. The emulator's NAND has no
 Forecast Channel data; testing the parser end to end needs a real or synthetic `wc24dl.vff`.
+
+
+## Corrections and findings from running it (supersede earlier statements)
+
+- **VFMount is `0x80434cb8`, and FCD must use drive `C`.** City Folk's VF library has a small fixed number of drive slots, all owned by the game; a new drive
+  name (FCD's private `@24`) fails in the slot allocator with `0xB002`. FCD's drive name and its two paths are therefore rewritten to `C`, `C:/3.bin`, `C:/4.bin`
+  (the drive the game's own NWC24 code mounts its `wc24dl.vff` on, through `0x80434cb8`).
+- **VF is only alive while the game's NWC24 needs it.** `VFInit(buf, 0x4000)` (`0x80434a20`, flag at SDA `-0x1b50`, slot count `-0x1b48`) is called by the NWC24
+  download-manager init with a buffer from the NWC24 heap, and shut down by `0x80434ae8`. `weather_platform_fetch` therefore brings VF up the same way when it is
+  not initialised and shuts it down again, and leaves the game's own instance alone when it is.
+- **short.bin is larger than the donor allows.** Current Forecast Channel data declares `short.bin` = 0x54CC bytes (0x5000 is rejected with -11). `fcdgen.py` patches four
+  immediates (each checked against the donor word) so the short.bin region is 0x7800 and the work buffer need is 0x3B89C (the allocation is 0x48000).
+- **The context-struct rewrite must cover the whole function.** An earlier generator only looked 14 instructions past each `lis`; three later uses (including the
+  parser's `ctx[0]`) kept the donor displacement and read the blob's own code. The scan now covers the function and the generator fails if any donor-layout immediate is
+  left, and the build verifier resolves far uses.
+- **The City is never overridden.** Scene kinds have flag words (table `0x80479be0`, 0x44 entries, kind byte at SDA `-0x6384`, accessors `0x80162524/48/94`). Bit `0x200` is set for the
+  City's outdoor kinds (0x27-0x2b, flags `..1290`) and its interiors (0x2c, 0x2e, 0x31, 0x36); the town's outdoor kinds are 1-16 (`..0450`), rooms 0x11-0x1a (`..0850`), the bus
+  0x3c-0x3e (`0x4000`). The classifier at `0x80111570` groups them the same way. Both hooks return "fall through" when the current scene has `0x200`, before any fetch.
+- **Dolphin test notes.** Your full NAND makes the *unpatched* game crash in the emulator (exception at 0x3400), so the test copies only `shared2/sys`, `shared2/wc24`, the system
+  `setting.txt` folder and the forecast title (`MIN_NAND=1`). GDB breakpoints do not trigger in this setup (and idle-thread interrupts are unsafe for calls), so exercising the
+  fetch relies on the title scenery calling the weather hook, or on the `--selftest` build flag. `--trace` records FCDInit's call results in memory.
+
+Result on the final production build in Dolphin (title scene, your forecast data): FCDInit = 0, own area id read from savedata, 7 days cached
+(thunderstorms x4 -> heavy rain, clouds x2 -> mild overcast, sunny -> clear), scene kind 0x38 (not the City), no crash, VF shut down again afterwards.
+
+Still untested: the effect in the town itself (visual weather, music, TV program), the City (can only be checked by playing there), a real controller holding B, and a
+fetch racing the game's own NWC24 use of drive `C`.

@@ -15,6 +15,11 @@ START, END = 0x80562950, 0x8056481C
 LOADLZ = (0x805633D8, 0x80563574)           # replaced by fcd_load_lz
 RT_DELTA = 0x8060BFB0 - 0x8044E808          # MW runtime helpers: identical block in City Folk
 
+# City Folk's VF library has a fixed, small number of drive slots and the game already owns them
+# (allocating a new name fails with 0xB002), so FCD's private drive "@24" is replaced by the game's
+# own drive "C", the one its NWC24 code mounts its VFF on.
+DRIVE = "C"
+
 API = {                                      # donor address -> exported symbol
     0x80562950: "FCDGetWorkMemorySize", 0x8056295C: "FCDInit", 0x80562BE4: "FCDGetForecast",
     0x80562FBC: "FCDGetCurrent", 0x805631F4: "FCDGetOwnAddressId", 0x80563224: "FCDGetPlace",
@@ -33,6 +38,18 @@ EXT = {
 for a in (0x8060BFB0, 0x8060BFD8, 0x8060BFDC, 0x8060BFE0, 0x8060BFFC, 0x8060C024,
           0x8060C028, 0x8060C02C, 0x8060C134):
     EXT[a] = "accf_rt_%08x" % (a - RT_DELTA)
+
+# Layout of the work buffer. The donor reserves 0x5000 bytes for short.bin, but current Forecast Channel data
+# declares 0x54CC bytes (0x5000 is rejected with -11), so the short.bin region grows to 0x7800. City Folk allocates
+# 0x48000 for the work buffer, so the total (0x3B89C) fits. Each patch checks the donor's original word.
+SHORT_REGION = 0x7800
+WORK_NEED = 0x3909C + (SHORT_REGION - 0x5000)           # 0x3B89C
+WORD_PATCHES = {
+    0x80562954: (0x3863909C, 0x38630000 | (-(0x40000 - WORK_NEED) & 0xFFFF)),    # FCDGetWorkMemorySize: addi r3,r3,-X
+    0x805629AC: (0x3803909C, 0x38030000 | (-(0x40000 - WORK_NEED) & 0xFFFF)),    # FCDInit bound: addi r0,r3,-X
+    0x805629C0: (0x3866501F, 0x38660000 | (SHORT_REGION + 0x1F)),                # carve: short region + alignment
+    0x80562A7C: (0x38805000, 0x38800000 | SHORT_REGION),                         # max decompressed size of short.bin
+}
 
 # donor data objects -> our symbols
 OBJ = {  # name: (donor address, size)
@@ -117,7 +134,7 @@ def uses_reg(x, r):
     return True                                         # unknown: be conservative
 
 
-def generate(donor_path):
+def generate(donor_path, trace=False):
     D = Donor(donor_path)
     r13 = D.r13()
     w = D.words(START, (END - START) // 4)
@@ -150,7 +167,7 @@ def generate(donor_path):
             continue
         rt, hi = (x >> 21) & 31, x & 0xFFFF
         found = set()
-        for j in range(i + 1, min(i + 14, len(w))):
+        for j in range(i + 1, min(i + 400, len(w))):
             y = w[j]; op = y >> 26
             if in_loadlz(addr(j)):
                 break
@@ -171,6 +188,18 @@ def generate(donor_path):
             assert len(found) == 1, (hex(addr(i)), found)
             lis_sym[i] = found.pop()
 
+    # completeness: every instruction carrying the low half of a donor data address must have been rewritten
+    donor_lows = {OBJ[n][0] & 0xFFFF: n for n in OBJ}
+    for i, x in enumerate(w):
+        a = addr(i)
+        if in_loadlz(a) or (x >> 26) not in (14, 24) and (x >> 26) not in LOAD_STORE:
+            continue
+        if (x >> 26) == 15:
+            continue
+        if (x & 0xFFFF) in donor_lows and ((x >> 16) & 31) != 13 and i not in use_fix and (x >> 26) != 14 + 0 * 1 or \
+           ((x & 0xFFFF) in donor_lows and (x >> 26) == 14 and ((x >> 16) & 31) != 0 and i not in use_fix):
+            raise SystemExit("unrewritten donor data reference at %#x (%08x), object %s" % (a, x, donor_lows[x & 0xFFFF]))
+
     r12_ok = []
     def r12_free(i):
         lo = max(0, i - 6); hi = min(len(w), i + 7)
@@ -183,6 +212,7 @@ def generate(donor_path):
     emit("    .text\n    .balign 4")
     n_sda = n_obj = 0
     sizes = {}                     # donor address -> number of instructions emitted for it
+    trace_names = []
     sda_uses = {}                  # donor address -> SDA replacement symbol
     for i, x in enumerate(w):
         a = addr(i)
@@ -201,6 +231,11 @@ def generate(donor_path):
             lk = x & 1
             if op == 18:
                 emit("    %s %s   /* %08x */" % ("bl" if lk else "b", sym, a))
+                if trace and lk and t in EXT and 0x8056295C <= a < 0x80562BE4:
+                    k = len(trace_names)
+                    trace_names.append("%s @%08x" % (sym, a))
+                    sizes[a] = 3
+                    emit("    lis r12,fcd_trace@ha\n    stw r3,(fcd_trace+%d)@l(r12)   /* trace: result of %s */" % (4 * k, sym))
             else:
                 emit("    %s %d,%d,%s   /* %08x */" % ("bcl" if lk else "bc", rt, ra, sym, a))
         elif ra == 13 and (op == 14 or op in LOAD_STORE) and s16(x & 0xFFFF) in SDA:
@@ -232,6 +267,10 @@ def generate(donor_path):
                 emit("    ori r%d,r%d,%s   /* %08x */" % (ra, rt, ref, a))
             else:
                 emit("    %s r%d,%s(r%d)   /* %08x */" % (LOAD_STORE[op], rt, ref, ra, a))
+        elif a in WORD_PATCHES:
+            orig, new = WORD_PATCHES[a]
+            assert x == orig, "donor word at %#x is %08x, expected %08x" % (a, x, orig)
+            emit("    .long 0x%08x   /* %08x patched from %08x: work buffer layout */" % (new, a, x))
         else:
             emit("    .long 0x%08x   /* %08x */" % (x, a))
 
@@ -252,13 +291,16 @@ def generate(donor_path):
     p_b = struct.unpack(">I", D.read(r13 - 0x7318, 4))[0]
     emit("    .balign 4\nfcd_flag:\n    .long 0")
     emit("fcd_p_forecast:\n    .long fcd_str_forecast\nfcd_p_short:\n    .long fcd_str_short\nfcd_p_banner:\n    .long fcd_str_banner")
-    emit("fcd_s_drive:\n    .asciz \"%s\"" % D.read(r13 - 0x730C, 4).split(b"\0")[0].decode())
-    emit("fcd_str_forecast:\n    .asciz \"%s\"\nfcd_str_short:\n    .asciz \"%s\"" % (D.cstr(p_f).decode(), D.cstr(p_s).decode()))
+    donor_drive = D.read(r13 - 0x730C, 4).split(b"\0")[0].decode()
+    emit("fcd_s_drive:\n    .asciz \"%s\"" % DRIVE)
+    emit("fcd_str_forecast:\n    .asciz \"%s\"\nfcd_str_short:\n    .asciz \"%s\"" % (D.cstr(p_f).decode().replace(donor_drive, DRIVE, 1), D.cstr(p_s).decode().replace(donor_drive, DRIVE, 1)))
     banner = D.cstr(p_b).decode().replace("\\", "\\\\").replace("\t", "\\t").replace('"', '\\"')
     emit("fcd_str_banner:\n    .asciz \"%s\"" % banner)
+    if trace:
+        emit("    .balign 4\n    .globl fcd_trace\nfcd_trace:\n    .space 64")
     emit("    .balign 4\n    .globl fcd_crc_table\nfcd_crc_table:")
     emit("    .long " + ",".join("0x%08x" % v for v in D.words(0x80657C78, 16)))
-    return "\n".join(out) + "\n", dict(sda=n_sda, obj=n_obj, targets=targets, donor=D, sizes=sizes, sda_uses=sda_uses,
+    return "\n".join(out) + "\n", dict(sda=n_sda, obj=n_obj, targets=targets, donor=D, sizes=sizes, sda_uses=sda_uses, trace_names=trace_names,
                                           use_fix={addr(j): v for j, v in use_fix.items()},
                                           lis_sym={addr(j): v for j, v in lis_sym.items()})
 

@@ -25,8 +25,14 @@ typedef struct CalTime {
 /* Platform: fill codes[0..n-1] with the Forecast Channel condition code for the
  * game days starting at (game day of `date`) - dayBack (0xFFFF = unknown).
  * `dayBack` is 1 when the caller's date is already tomorrow (the TV hook).
- * Returns n (<= max), or <= 0 if no forecast data is available. */
+ * Returns n (<= max), 0 if no forecast data is available, or -1 if the platform is not ready yet
+ * (try again later; this does not count as a failed attempt). */
 s32 weather_platform_fetch(const CalTime *date, s32 dayBack, u16 *codes, s32 max);
+
+/* Flags of the scene the game is in (City Folk: per-scene-kind table, see FCD_PORT_NOTES.md). Bit 0x200 marks the
+ * City (its outdoor kinds 0x27-0x2b and its interiors): the City has its own weather and is never overridden. */
+#define WEATHER_SCENE_CITY 0x200
+u32 weather_platform_scene_flags(void);
 
 /* Game day number of a calendar time. City Folk's day rolls over at 6 AM. */
 s32 weather_game_day(const CalTime *c);

@@ -11,7 +11,7 @@ ret_pad       = 0x804438e4;
 /* functions the transplanted FCD code calls (donor address in the comment) */
 accf_OSSetMEM1ArenaLo  = 0x8037be1c;   /* OSSetMEM1ArenaLo */
 accf_OSRegisterVersion = 0x8037b234;   /* 0x8056a788 */
-accf_VFMount           = 0x80434e44;   /* 0x80463b88 */
+accf_VFMount           = 0x80434cb8;   /* 0x80463b88: the variant the game's own NWC24 code uses (drive "C") */
 accf_VFUnmount         = 0x80434fd0;   /* 0x80463d14 */
 accf_NANDOpen          = 0x803a8a2c;   /* 0x805a5b48 */
 accf_NANDGetLength     = 0x803a8154;   /* 0x805a541c */
