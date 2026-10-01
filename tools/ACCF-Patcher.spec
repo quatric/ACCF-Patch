@@ -10,7 +10,7 @@ dnd_datas, dnd_binaries, dnd_hidden = collect_all('tkinterdnd2')
 
 a = Analysis(
     ['gui.py'],
-    pathex=[os.path.join(SPECPATH, '..', 'gcpad')],
+    pathex=[os.path.join(SPECPATH, '..', 'gcpad'), os.path.join(SPECPATH, 'weather')],
     binaries=dnd_binaries,
     datas=dnd_datas + [(os.path.join(SPECPATH, '..', 'gcpad', 'patches.json'), 'gcpad')],
     hiddenimports=dnd_hidden,
@@ -28,7 +28,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='ACCF-SDHC-Patcher',
+    name='ACCF-Patcher',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -47,11 +47,11 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='ACCF-SDHC-Patcher',
+    name='ACCF-Patcher',
 )
 app = BUNDLE(
     coll,
-    name='ACCF-SDHC-Patcher.app',
+    name='ACCF-Patcher.app',
     icon=ICON,
     bundle_identifier='net.quatric.accf-sdhc-patcher',
 )

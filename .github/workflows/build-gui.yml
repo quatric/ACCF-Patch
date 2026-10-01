@@ -81,25 +81,27 @@ jobs:
         run: |
           BINS=""
           for f in wit_bin/*; do BINS="$BINS --add-binary $f:."; done
-          pyinstaller --name ACCF-SDHC-Patcher --windowed --noconfirm \
+          pyinstaller --name ACCF-Patcher --windowed --noconfirm \
             --collect-all tkinterdnd2 \
+            --paths gcpad --paths tools/weather --add-data gcpad/patches.json:gcpad \
             --icon assets/icon.icns --target-architecture universal2 \
             $BINS --distpath pyinst_dist tools/gui.py
-          cp wit-gpl-2.0.txt "pyinst_dist/ACCF-SDHC-Patcher.app/Contents/Resources/wit-gpl-2.0.txt"
+          cp wit-gpl-2.0.txt "pyinst_dist/ACCF-Patcher.app/Contents/Resources/wit-gpl-2.0.txt"
           cd pyinst_dist
-          zip -qr "../ACCF-SDHC-Patcher-${{ matrix.target }}.zip" ACCF-SDHC-Patcher.app
+          zip -qr "../ACCF-Patcher-${{ matrix.target }}.zip" ACCF-Patcher.app
 
       - name: Build app (Linux)
         if: matrix.target == 'linux-x86_64'
         run: |
           BINS=""
           for f in wit_bin/*; do BINS="$BINS --add-binary $f:."; done
-          pyinstaller --name ACCF-SDHC-Patcher --windowed --noconfirm \
+          pyinstaller --name ACCF-Patcher --windowed --noconfirm \
             --collect-all tkinterdnd2 \
+            --paths gcpad --paths tools/weather --add-data gcpad/patches.json:gcpad \
             $BINS --distpath pyinst_dist tools/gui.py
-          cp wit-gpl-2.0.txt pyinst_dist/ACCF-SDHC-Patcher/
+          cp wit-gpl-2.0.txt pyinst_dist/ACCF-Patcher/
           cd pyinst_dist
-          tar -czf "../ACCF-SDHC-Patcher-${{ matrix.target }}.tar.gz" ACCF-SDHC-Patcher
+          tar -czf "../ACCF-Patcher-${{ matrix.target }}.tar.gz" ACCF-Patcher
 
       - name: Build app (Windows)
         if: matrix.target == 'windows-x86_64'
@@ -107,25 +109,26 @@ jobs:
         run: |
           BINS=""
           for f in wit_bin/*; do BINS="$BINS --add-binary $f;."; done
-          pyinstaller --name ACCF-SDHC-Patcher --windowed --noconfirm \
+          pyinstaller --name ACCF-Patcher --windowed --noconfirm \
             --collect-all tkinterdnd2 \
+            --paths gcpad --paths tools/weather --add-data "gcpad/patches.json;gcpad" \
             --icon assets/icon.ico \
             $BINS --distpath pyinst_dist tools/gui.py
-          cp wit-gpl-2.0.txt pyinst_dist/ACCF-SDHC-Patcher/
+          cp wit-gpl-2.0.txt pyinst_dist/ACCF-Patcher/
           cd pyinst_dist
-          7z a "../ACCF-SDHC-Patcher-${{ matrix.target }}.zip" ACCF-SDHC-Patcher \
-            || powershell -Command "Compress-Archive -Path ACCF-SDHC-Patcher -DestinationPath ../ACCF-SDHC-Patcher-${{ matrix.target }}.zip"
+          7z a "../ACCF-Patcher-${{ matrix.target }}.zip" ACCF-Patcher \
+            || powershell -Command "Compress-Archive -Path ACCF-Patcher -DestinationPath ../ACCF-Patcher-${{ matrix.target }}.zip"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ACCF-SDHC-Patcher-${{ matrix.target }}
-          path: ACCF-SDHC-Patcher-${{ matrix.target }}.*
+          name: ACCF-Patcher-${{ matrix.target }}
+          path: ACCF-Patcher-${{ matrix.target }}.*
 
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: ACCF-SDHC-Patcher-${{ matrix.target }}.*
+          files: ACCF-Patcher-${{ matrix.target }}.*
 
   patch-files:
     runs-on: ubuntu-22.04

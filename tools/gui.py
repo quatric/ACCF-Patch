@@ -28,7 +28,10 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '
 import dist
 import patch_dol
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'weather'))
-import apply_weather
+try:
+    import apply_weather
+except ImportError:                                    # weather stays off rather than stopping the app
+    apply_weather = None
 from dol import Dol
 
 try:
@@ -157,6 +160,8 @@ def run_patch(image_path, log, done, sdhc=True, gc=False, weather=False):
                 data = patch_dol.apply(data, patch_dol.load(key, root=gcpad_dir()))
                 log('  added GameCube controller (port 1) support')
             if weather:
+                if apply_weather is None or not apply_weather.available():
+                    raise RuntimeError('weather patch data (weather_patches.json) is not available')
                 data = apply_weather.apply(data, key)
                 log('  added Forecast Channel weather')
             open(dol_path, 'wb').write(data)
@@ -190,7 +195,7 @@ BASE = TkinterDnD.Tk if HAVE_DND else tk.Tk
 class App(BASE):
     def __init__(self):
         super().__init__()
-        self.title('ACCF Patcher')
+        self.title('ACCF-Patcher')
         self.geometry('600x500')
         self.msgq = queue.Queue()
         self.busy = False
@@ -219,7 +224,7 @@ class App(BASE):
         wcb = tk.Checkbutton(opts, text='Forecast Channel weather (needs weather_patches.json, see tools/weather)',
                              variable=self.weather)
         wcb.pack(anchor='w')
-        if not apply_weather.available():
+        if apply_weather is None or not apply_weather.available():
             wcb.configure(state='disabled')
 
         tk.Label(self, text='The original is kept alongside as <name>.bak',

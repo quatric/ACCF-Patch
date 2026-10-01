@@ -30,7 +30,7 @@ struct st {
     u32 busy_tb;    /* when si:: was first seen busy (0 = idle) */
     u8 norep;       /* consecutive frames with NOREP on port 1 */
     u8 ours;        /* the last KPAD sample on channel 0 was ours */
-    u32 dbg_h, dbg_l;   /* last pad response seen by gc_sample (for debugging) */
+    u32 prev_btn;       /* the Classic Controller buttons of the previous frame's sample */
 };
 #define ST ((volatile struct st *)STATE)
 
@@ -154,9 +154,9 @@ static inline s16 stick(u32 raw)
     return (s16)v;
 }
 
-static void fill_cc(u8 *s, u32 h, u32 l)
+static __attribute__((noinline)) u32 cc_buttons(u32 h)
 {
-    u32 b = 0, la = (l >> 8) & 0xFF, ra = l & 0xFF;
+    u32 b = 0;
 
     if (h & 0x01000000u) b |= CL_A;          /* A: confirm / action */
     if (h & 0x02000000u) b |= CL_B;          /* B: cancel / run / pick up */
@@ -170,47 +170,59 @@ static void fill_cc(u8 *s, u32 h, u32 l)
     if (h & 0x00040000u) b |= CL_DOWN;
     if (h & 0x00020000u) b |= CL_RIGHT;
     if (h & 0x00010000u) b |= CL_LEFT;
+    return b;
+}
 
+static __attribute__((noinline)) void fill_cc(u8 *s, u32 h, u32 l, u32 b)
+{
     *(u16 *)(s + 0x2A) = (u16)b;
     *(s16 *)(s + 0x2C) = stick(h >> 8);      /* control stick x */
     *(s16 *)(s + 0x2E) = stick(h);           /* control stick y */
     *(s16 *)(s + 0x30) = stick(l >> 24);     /* C-stick x */
     *(s16 *)(s + 0x32) = stick(l >> 16);     /* C-stick y */
-    s[0x34] = (h & 0x00400000u) ? 180 : (u8)((la * 180) / 255);
-    s[0x35] = (h & 0x00200000u) ? 180 : (u8)((ra * 180) / 255);
+    s[0x34] = (h & 0x00400000u) ? 180 : 0;   /* digital L / R: the game reads them only as buttons */
+    s[0x35] = (h & 0x00200000u) ? 180 : 0;
     s[0x28] = 2;                             /* extension: Classic Controller */
     s[0x29] = 0;                             /* no extension error */
     s[0x36] = 8;                             /* classic + accel + pointer data */
 }
 
+/* one fresh Classic Controller sample at ring slot `idx` */
+static __attribute__((noinline)) void put_sample(u8 *k, u32 idx, u32 h, u32 l, u32 b)
+{
+    u32 *p = (u32 *)(k + 0x110 + (idx & 0xF) * 0x38);
+    u32 i;
+
+    for (i = 0; i < 0x38 / 4; i++)
+        p[i] = 0;
+    fill_cc((u8 *)p, h, l, b);
+}
+
+/* The game's controller class (EGG) reads the left stick from the *second* status entry KPADRead returns, so one
+ * sample per frame leaves it at zero.  A Wii Remote delivers two or three per read; so do we: two samples, the
+ * older with the previous frame's buttons (so the press and release edges still land in the newest entry) and
+ * both with the current sticks. */
 void gc_sample(u8 *k, u32 chan)
 {
-    u32 h, l;
-    u8 cnt, idx;
-    u32 i;
+    u32 h, l, b, i, idx, cnt;
 
     if (chan || !gc_in(&h, &l))
         return;
 
-    ST->dbg_h = h;
-    ST->dbg_l = l;
+    b = cc_buttons(h);
+    idx = k[0x10E] & 0xF;       /* the ring wraps at 16: 0x10 and 0 are the same slot */
     cnt = k[0x10F];
-    idx = k[0x10E];
     if (cnt == 0) {
         /* no sample queued: no Wii Remote (dev type 0xFD), a bare one that
          * has not delivered one yet, or our own sample showing through */
         u8 dev = k[0x5C];
-        u8 *s;
         if (!(dev == 0 || dev == 0xFD || ST->ours))
             return;
-        if (idx >= 0x10)
-            idx = 0;
-        s = k + 0x110 + idx * 0x38;
-        for (i = 0; i < 0x38; i += 4)
-            *(u32 *)(s + i) = 0;
-        fill_cc(s, h, l);
-        k[0x10E] = idx + 1;
-        k[0x10F] = 1;
+        put_sample(k, idx, h, l, ST->prev_btn);
+        put_sample(k, idx + 1, h, l, b);
+        k[0x10E] = (idx + 2) & 0xF;
+        k[0x10F] = 2;
+        ST->prev_btn = b;
         ST->ours = 1;
         return;
     }
@@ -218,12 +230,24 @@ void gc_sample(u8 *k, u32 chan)
     /* real samples queued: a bare Wii Remote gets the pad as its extension;
      * a real Nunchuk or Classic Controller is never touched */
     ST->ours = 0;
+    ST->prev_btn = b;
     if (cnt > 0x10)
         cnt = 0x10;
     for (i = 0; i < cnt; i++) {
         u8 *s = k + 0x110 + ((idx - cnt + i) & 0xF) * 0x38;
         if (s[0x28] == 0 || s[0x28] == 0xFD)
-            fill_cc(s, h, l);
+            fill_cc(s, h, l, b);
+    }
+    if (cnt == 1) {
+        /* a lone real sample: queue a copy after it so there is a second entry */
+        u32 *src = (u32 *)(k + 0x110 + ((idx - 1) & 0xF) * 0x38);
+        u32 *dst = (u32 *)(k + 0x110 + idx * 0x38);
+        if (((u8 *)src)[0x28] == 2) {
+            for (i = 0; i < 0x38 / 4; i++)
+                dst[i] = src[i];
+            k[0x10E] = (idx + 1) & 0xF;
+            k[0x10F] = 2;
+        }
     }
 }
 #endif

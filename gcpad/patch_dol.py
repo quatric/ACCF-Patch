@@ -66,27 +66,55 @@ def apply(data, patch):
     cave = dol.d[dol.v2f(state):dol.v2f(state) + 0x80]
     if any(cave):
         raise RuntimeError('the state area at 0x%08X is not empty; already patched, or another build' % state)
-    size = sum(len(w) for _, w in patch['sites']) * 4
-    base = BASE
-    for _ in range(8):
-        hit = [a + s for a, s in zip(dol.addr, dol.size) if s and a < base + size and base < a + s]
-        if not hit:
+    # Bodies are position independent.  They go in a new low-memory section; if that does not fit (Deluxe
+    # discs already use the start of it) the smallest ones move to the zeroed padding after the state area.
+    sites = list(patch['sites'])
+    cave_at, cave_end = state + 0x80, state + 0x380
+    moved = []
+    def low_base(size):
+        base = BASE
+        for _ in range(8):
+            hit = [a + s for a, s in zip(dol.addr, dol.size) if s and a < base + size and base < a + s]
+            if not hit:
+                break
+            base = (max(hit) + 0x1F) & ~0x1F
+        return base
+
+    while True:
+        size = sum(len(w) for _, w in sites) * 4
+        base = low_base(size)
+        if base + size <= LIMIT or not sites:
             break
-        base = (max(hit) + 0x1F) & ~0x1F
+        small = min(sites, key=lambda x: len(x[1]))
+        sites.remove(small)
+        moved.append(small)
+    if moved:
+        if sum(len(w) for _, w in moved) * 4 > cave_end - cave_at or any(dol.d[dol.v2f(cave_at):dol.v2f(cave_end)]):
+            raise RuntimeError('patch does not fit in low memory below 0x%08X' % LIMIT)
     placed, blob = [], bytearray()
-    for site, words in patch['sites']:
-        at = base + len(blob)
+
+    def body(at, words, site):
         if dol.word(site) >> 26 == 18 and dol.word(site) & 2 == 0:
             tgt = site + (((dol.word(site) & 0x03FFFFFC) ^ 0x02000000) - 0x02000000)
-            if 0x80001800 <= tgt < LIMIT:
+            if 0x80001800 <= tgt < LIMIT or cave_at <= tgt < cave_end:
                 raise RuntimeError('hook site 0x%08X is already patched' % site)
         w = list(words)
         w[-1] = branch(at + 4 * (len(w) - 1), site + 4)
-        blob += struct.pack('>%dI' % len(w), *w)
+        return struct.pack('>%dI' % len(w), *w)
+
+    for site, words in sites:
+        at = base + len(blob)
+        blob += body(at, words, site)
         placed.append((site, at))
-    if base + len(blob) > LIMIT:
-        raise RuntimeError('patch does not fit in low memory below 0x%08X' % LIMIT)
-    dol.add_text(base, bytes(blob))
+    at = cave_at
+    for site, words in moved:
+        data = body(at, words, site)
+        fo = dol.v2f(at)
+        dol.d[fo:fo + len(data)] = data
+        placed.append((site, at))
+        at += len(data)
+    if blob:
+        dol.add_text(base, bytes(blob))
     for site, at in placed:
         dol.put(site, branch(site, at))
     for va, word in patch['writes']:

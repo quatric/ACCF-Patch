@@ -9,7 +9,7 @@ Ported from **SDHC Extension 1.1 [Bero]** by way of *My Pokémon Ranch*.
 The patcher has three independent checkboxes: **SDHC card support** (on by default), **GameCube controller** (port 1) and **Forecast Channel weather**
 (the last needs a one-time local build, see below). Tick what you want, drop the disc.
 
-1. **Download** `ACCF-SDHC-Patcher` for your platform from
+1. **Download** `ACCF-Patcher` for your platform from
    [Releases](https://github.com/quatric/ACCF-SDHC/releases).
 2. **Drop your `.wbfs`/`.iso` on the window.** It reads the disc's own ID and
    revision, applies the matching patch, and rebuilds the image in place. The
@@ -176,8 +176,8 @@ works as click-to-browse). The packaged builds below bundle both.
 
 For a quick local macOS build during development (`wit` still needs to be on
 `PATH`), install [PyInstaller](https://pyinstaller.org/) and run
-`tools/build_gui.sh`; this uses the checked-in `tools/ACCF-SDHC-Patcher.spec`
-and produces `tools/dist/ACCF-SDHC-Patcher.app`.
+`tools/build_gui.sh`; this uses the checked-in `tools/ACCF-Patcher.spec`
+and produces `tools/dist/ACCF-Patcher.app`.
 
 [`.github/workflows/build-gui.yml`](.github/workflows/build-gui.yml) builds
 real, distributable binaries: macOS (universal2), Linux (x86_64), and Windows
@@ -186,7 +186,7 @@ Tool](https://wit.wiimm.de/download.html) publishes prebuilt binaries for, out
 of the fuller set Mobipeg targets. Each bundles the matching `wit` build
 (GPLv2; `wit-gpl-2.0.txt` ships alongside it) so nothing else needs to be
 installed. Every run (and additionally as release assets on a `v*` tag push)
-publishes `ACCF-SDHC-Patcher-<target>.*` for each platform, plus two separate,
+publishes `ACCF-Patcher-<target>.*` for each platform, plus two separate,
 platform-independent archives: `ACCF-SDHC-Gecko-Codes.zip` (`gecko/*.txt`) and
 `ACCF-SDHC-Riivolution.zip` (`riivolution/*.xml`). Both keep the per-revision
 filenames. The Gecko codes need a code handler and manual address-matching per

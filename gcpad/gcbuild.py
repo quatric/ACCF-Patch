@@ -80,7 +80,7 @@ def compile_hook(name, defs):
     D = ['-D%s=%s' % kv for kv in defs.items()] + ['-DHOOK_' + name]
     if os.environ.get('DEBUG_FEED'):
         D.append('-DDEBUG_FEED')
-    cflags = ['-O2', '-mbig-endian', '-msoft-float', '-msdata=none', '-ffreestanding', '-fno-pic',
+    cflags = ['-O2', '-fno-unroll-loops', '-mbig-endian', '-msoft-float', '-msdata=none', '-ffreestanding', '-fno-pic',
               '-fno-asynchronous-unwind-tables', '-fno-stack-protector', '-nostdlib', '-Wall']
     subprocess.check_call([CC + 'gcc'] + cflags + D + ['-c', src + '/gcpad.c', '-o', tmp + '/g.o'])
     subprocess.check_call([CC + 'gcc', '-mbig-endian', '-c', '-x', 'assembler-with-cpp'] + D +

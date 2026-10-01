@@ -60,7 +60,7 @@ to read. Three hooks fix that (`src/gcpad.c`, one small blob each):
 | Hook | Site | What it does |
 | --- | --- | --- |
 | poll | `KPADiRead` entry | Drives the Serial Interface's own auto-polling for port 1, re-probes a replugged pad, acknowledges latched errors, and frees si:: if an unplugged pad leaves its busy flag stuck |
-| sample | `KPADiRead`, before the queued-sample check | Writes the pad into KPAD's sample ring as a Classic Controller sample (extension 2, format 8: buttons, both sticks, both triggers). With a Wii Remote connected, its own samples get the pad as their extension instead |
+| sample | `KPADiRead`, before the queued-sample check | Writes the pad into KPAD's sample ring as Classic Controller samples (extension 2, format 8). Two per frame, like a Wii Remote delivers: the game's controller class reads the left stick from the second entry `KPADRead` returns, so a single sample left the stick dead. With a Wii Remote connected, its own samples get the pad as their extension instead |
 | probe | `WPADProbe` entry | Reports a Classic Controller on channel 0 while a pad is plugged in, so the game believes a controller is connected |
 
 Everything is expressed as a Classic Controller sample, so the rest — button
