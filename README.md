@@ -186,7 +186,7 @@ Tool](https://wit.wiimm.de/download.html) publishes prebuilt binaries for, out
 of the fuller set Mobipeg targets. Each bundles the matching `wit` build
 (GPLv2; `wit-gpl-2.0.txt` ships alongside it) so nothing else needs to be
 installed. Every run (and additionally as release assets on a `v*` tag push)
-publishes `ACCF-Patcher-<target>.*` for each platform, plus two separate,
+publishes `ACCF-Patch-<target>.*` for each platform, plus two separate,
 platform-independent archives: `ACCF-Patch-SDHC-Gecko-Codes.zip` (`gecko/*.txt`) and
 `ACCF-Patch-SDHC-Riivolution.zip` (`riivolution/*.xml`). Both keep the per-revision
 filenames. The Gecko codes need a code handler and manual address-matching per
