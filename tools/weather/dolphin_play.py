@@ -12,15 +12,25 @@ HOME = os.path.expanduser("~/Library/Application Support/Dolphin")
 def main():
     image, user = sys.argv[1], sys.argv[2]
     save = sys.argv[3] if len(sys.argv) > 3 else None
-    shutil.rmtree(user, ignore_errors=True)
-    os.makedirs(os.path.join(user, "Config"))
-    for f in os.listdir(os.path.join(HOME, "Config")):
-        if f.endswith(".ini") and f != "Logger.ini":
-            shutil.copy(os.path.join(HOME, "Config", f), os.path.join(user, "Config", f))
+    keep = bool(os.environ.get("KEEP")) and os.path.isdir(user)
+    if not keep:
+        shutil.rmtree(user, ignore_errors=True)
+        os.makedirs(os.path.join(user, "Config"))
+    if not keep:
+        for f in os.listdir(os.path.join(HOME, "Config")):
+            if f.endswith(".ini") and f != "Logger.ini":
+                shutil.copy(os.path.join(HOME, "Config", f), os.path.join(user, "Config", f))
     ini = os.path.join(user, "Config", "Dolphin.ini")
     text = open(ini).read()
     text = "\n".join("WiiSDCard = False" if ln.startswith("WiiSDCard =") else ln for ln in text.split("\n"))
+    if os.environ.get("DEBUG_STUB") and "GDBPort" not in text:
+        # a debug connection (port 2159) so the logger can read the game's state while you play; needs the JIT debug checks off
+        text = text.replace("[General]\n", "[General]\nGDBPort = 2159\n", 1)
     open(ini, "w").write(text)
+    if keep:
+        subprocess.check_call(["open", "-n", "-a", "/Applications/Dolphin.app", "--args", "-u", user, "-e", image])
+        print("reopened (progress kept)", image)
+        return
     for rel in ("shared2/sys", "shared2/wc24", "title/00000001/00000002/data", "title/00010002/48414645"):
         src = os.path.join(HOME, "Wii", rel)
         if os.path.exists(src):

@@ -1,4 +1,5 @@
 #include "fcd_loader.h"
+#include "weather.h"
 
 extern FcdCtx fcd_ctx;
 extern const u32 fcd_crc_table[16];    /* donor's nibble table, emitted by fcdgen.py */
@@ -156,12 +157,15 @@ u32 fcd_crc32(const u8 *p, u32 len)
 #ifndef FCD_HOST
 register char *fcd_sda asm("r13");
 
-/* current scene kind: u8 at SDA -0x6384(r13) (0x80162548); its flag word is table[kind] at 0x80479be0, 0x44 entries
- * (0x80162524) */
+/* current scene kind: u8 at SDA -0x6384(r13) (0x80162548). The game's own City test (0x801c9578, which picks the
+ * City weather variant 0x801c9d9c over the town one 0x801c9d24) is: byte table at 0x80479F10 (0x44 entries,
+ * 0x8016286c) nonzero for the kind, or kind 0x3d. */
 u32 weather_platform_scene_flags(void)
 {
     u32 kind = *(u8 *)(fcd_sda - 0x6384);
-    return kind < 0x44 ? ((const u32 *)0x80479BE0)[kind] : 0;
+    if (kind == 0x3D || (kind < 0x44 && ((const u8 *)0x80479F10)[kind]))
+        return WEATHER_SCENE_CITY;
+    return 0;
 }
 
 /* NWC24 heap: SDA -0x3284(r13); EGG heap vtable +0x14 alloc(size, align), +0x18 free(ptr) */
