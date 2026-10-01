@@ -6,8 +6,8 @@ Ported from **SDHC Extension 1.1 [Bero]** by way of *My Pokémon Ranch*.
 
 ## Quick start
 
-The patcher has three independent checkboxes: **SDHC card support** (on by default), **GameCube controller** (port 1) and **Forecast Channel weather**
-(the last needs a one-time local build, see below). Tick what you want, drop the disc.
+The patcher has three independent checkboxes: **SDHC card support**, **GameCube controller** (port 1) and **Forecast Channel weather**,
+all on by default. Untick what you don't want, drop the disc.
 
 1. **Download** `ACCF-Patcher` for your platform from
    [Releases](https://github.com/quatric/ACCF-SDHC/releases).

@@ -120,9 +120,12 @@ def run_patch(image_path, log, done, sdhc=True, gc=False, weather=False):
                 raise RuntimeError('nothing selected: tick at least one patch')
             key, label, delta = key_for(disc_id, disc_ver)
             if not key and disc_id in KOREA:
+                if sdhc and not (gc or weather):
+                    raise RuntimeError('Korean discs already support SDHC cards; tick the controller '
+                                       'or weather patch instead.')
                 if sdhc:
-                    raise RuntimeError('Korean discs already support SDHC cards; untick the SDHC patch '
-                                       'to add the controller or weather patch.')
+                    log('Korean disc: SDHC is already supported, skipping that patch')
+                    sdhc = False
                 key, label = KOREA[disc_id]
             if not key:
                 raise RuntimeError(
@@ -216,12 +219,12 @@ class App(BASE):
         self.sdhc = tk.BooleanVar(value=True)
         tk.Checkbutton(opts, text='SDHC card support (cards over 2 GB)',
                        variable=self.sdhc).pack(anchor='w')
-        self.gc = tk.BooleanVar(value=False)
+        self.gc = tk.BooleanVar(value=True)
         tk.Checkbutton(opts, text='GameCube controller in port 1 (as a Classic Controller)',
                        variable=self.gc).pack(anchor='w')
 
-        self.weather = tk.BooleanVar(value=False)
-        wcb = tk.Checkbutton(opts, text='Forecast Channel weather (needs weather_patches.json, see tools/weather)',
+        self.weather = tk.BooleanVar(value=True)
+        wcb = tk.Checkbutton(opts, text='Forecast Channel weather (7-day forecast for your location)',
                              variable=self.weather)
         wcb.pack(anchor='w')
         if apply_weather is None or not apply_weather.available():
