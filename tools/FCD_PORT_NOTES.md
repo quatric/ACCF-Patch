@@ -336,3 +336,14 @@ Result on the final production build in Dolphin (title scene, your forecast data
 
 Still untested: the effect in the town itself (visual weather, music, TV program), the City (can only be checked by playing there), a real controller holding B, and a
 fetch racing the game's own NWC24 use of drive `C`.
+
+## Title screen and the game's clock offset
+
+- The game's calendar (`OSCalendarTime` at `0x80600898`) is the console's real timebase (`OSGetTime`, `0x803855d4`) **plus a saved offset** (`-0x2e10/-0x2e0c(r13)`). A save can carry a
+  large one (the test save put the game in 2036), and a forecast for the game's date then falls outside the data. `weather_platform_fetch` keeps the game's time of day (so the 6 AM
+  rollover follows the game) but moves its moment by whole days onto the real date before asking FCD. No offset means no shift.
+- With a save the title scene is scene kind 0x38 and renders the player's town. Its weather object (`dWeather_c`, pointer at SDA `-0x2ad8`; type at `+0x5884`, next-hour type `+0x5888`)
+  holds the forecast type: the unpatched game shows clear (type 0), the patched game heavy rain (type 4) with a storm sky and rain streaks over the town. Confirmed by reading the object
+  and by dumping frames, and confirmed by eye in Dolphin (patched vs regular).
+- `dolphin_watch.py` samples scene kind and the weather object over time, `dolphin_shot.py` dumps frames with a real video backend, `dolphin_play.py` opens an image in a normal
+  Dolphin window on an isolated user folder (your input configs, the minimal NAND, an optional raw save folder; virtual SD off).

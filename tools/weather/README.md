@@ -18,4 +18,6 @@ needs devkitPPC (`DEVKITPPC`, default `/opt/devkitpro/devkitPPC`). The donor sup
     python3 test_weather.py   # day math, mapping, cache, TV program, City rule, B latch, on the host
     MIN_NAND=1 WC24=1 python3 dolphin_test.py <image.wbfs> build/ 70    # boots the patched game in Dolphin (see FCD_PORT_NOTES.md)
 
+    python3 dolphin_play.py <image.wbfs> <scratch user dir> [raw Wii save folder]   # open it in a normal Dolphin window to look at it
+
 `../FCD_PORT_NOTES.md` has the reverse-engineering notes, addresses and the verification log.

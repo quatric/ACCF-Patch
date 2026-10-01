@@ -16,11 +16,13 @@ s32 accf_lock(void);
 s32 accf_unlock(void);
 u64 accf_cal_to_ticks(const CalTime *c);
 u32 accf_bus_clock(void);
+u64 accf_get_time(void);
 #else
 /* City Folk (RUUE02) */
 #define accf_lock          ((s32 (*)(void))0x8040c7dc)          /* twin of s.dol 0x80449e60 */
 #define accf_unlock        ((s32 (*)(void))0x8040c990)          /* twin of s.dol 0x80449f30 */
 #define accf_cal_to_ticks  ((u64 (*)(const CalTime *))0x803859e8)  /* OSCalendarTimeToTicks */
+#define accf_get_time      ((u64 (*)(void))0x803855d4)                /* OSGetTime: the console's real clock */
 #define accf_bus_clock()   (*(volatile u32 *)0x800000F8)
 /* VF library (City Folk): flag -0x1b50(r13) says initialised; the game's NWC24 code calls VFInit(buf, 0x4000) with a
  * buffer from the NWC24 heap when it needs VF and shuts it down afterwards */
@@ -71,7 +73,18 @@ s32 weather_platform_fetch(const CalTime *date, s32 dayBack, u16 *codes, s32 max
         if (g_fetch_status[3] == 0 && id != 0) {
             tps = accf_bus_clock() / 4;                 /* timebase ticks per second */
             tpd = (u64)tps * 86400u;
-            t   = accf_cal_to_ticks(date);
+            /* The game's calendar is the real clock plus a saved offset (a save can carry a large one, e.g. years).
+             * Forecasts are real-world: keep the game's time of day (so the 6 AM rollover follows the game) but move
+             * its moment by whole days onto the real date. No offset means no shift. */
+            t = accf_cal_to_ticks(date);
+            {
+                u64 now = accf_get_time();
+                u32 guard = 200000;
+                while (t > now + tpd / 2 && guard--)
+                    t -= tpd;
+                while (t + tpd / 2 < now && guard--)
+                    t += tpd;
+            }
             t  -= (u64)tps * 21600u;                    /* game day starts at 6 AM */
             for (i = 0; i < (u32)dayBack; i++)
                 t -= tpd;

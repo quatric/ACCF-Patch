@@ -20,6 +20,9 @@ PORT = 2159
 fail = []
 
 
+NAMES7 = ["clear", "mild overcast", "heavy overcast", "rain", "heavy rain", "snow", "heavy snow"]
+
+
 def check(cond, msg):
     print(("  ok   " if cond else "  FAIL ") + msg)
     if not cond:
@@ -39,6 +42,8 @@ def start(disc, build):
     ini = ("[General]\nGDBPort = %d\n[Interface]\nConfirmStop = False\nUsePanicHandlers = False\n"
            "[Core]\nMMU = True\nCPUThread = False\nCPUCore = 4\nEnableDebugging = True\nWiimoteContinuousScanning = False\n"
            "WiimoteControllerInterface = False\nEnableWiiLink = %s\n[Analytics]\nPermissionAsked = True\nEnabled = False\n" % (PORT, "True" if os.environ.get("WC24") else "False"))
+    if os.environ.get("FRAMEDUMP"):
+        ini += "[Movie]\nDumpFrames = True\nDumpFramesSilent = True\nDumpFramesAsImages = True\n"
     if os.environ.get("USER_INI"):
         # start from the user's real settings; add the GDB stub, drop the bits that would prompt or touch hardware
         real = open(os.path.expanduser("~/Library/Application Support/Dolphin/Config/Dolphin.ini")).read()
@@ -83,7 +88,7 @@ def start(disc, build):
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
                 shutil.copy(f, dst)
                 print("copied forecast data:", tid, rel, os.path.getsize(f), "bytes")
-    cmd = [DOLPHIN, "-b", "-u", user, "-e", disc, "-v", "Null"]
+    cmd = [DOLPHIN, "-b", "-u", user, "-e", disc, "-v", os.environ.get("VIDEO", "Null")]
     print("launching:", " ".join(cmd))
     subprocess.check_call(["open", "-n", "-a", "/Applications/Dolphin.app", "--args"] + cmd[1:])
     time.sleep(2)
@@ -200,6 +205,18 @@ def main():
             hdr = g.read_mem(c_tmp, 16)
             sz = hdr[1] | hdr[2] << 8 | hdr[3] << 16
             print("  last file read (chunk head): %s  -> type byte %#04x, claims %d (%#x) bytes decompressed (limit for short.bin is 0x5000)" % (hdr.hex(), hdr[0], sz, sz))
+        wptr = struct.unpack(">I", g.read_mem(r13 - 0x2AD8, 4))[0]
+        if 0x80000000 <= wptr < 0x94000000:
+            wcur, wnext = struct.unpack(">II", g.read_mem(wptr + 0x5884, 8))
+            windoor, wsnow = g.read_mem(wptr + 0x5894, 2)
+            print("  title scene weather object %#010x: current type %d (%s), next-hour type %d, indoor flag %d, snow-season flag %d" % (
+                wptr, wcur, NAMES7[wcur] if wcur < 7 else "?", wnext, windoor, wsnow))
+            if n_days > 0:
+                check(wcur == types[0] and wnext == types[0], "the title screen's weather is the forecast (type %d) " % types[0])
+            else:
+                print("  (vanilla weather: no forecast cached)")
+        else:
+            print("  (no weather object in the title scene)")
         check(title == 1, "a weather hook ran and closed the B window (title reached)")
         check(off_latch == 0, "B latch not set (nothing was held)")
         if n_days > 0:
