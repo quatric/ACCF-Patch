@@ -58,7 +58,7 @@ tramp_link:
     lwz     r0,0x24(r1)
     mtlr    r0
     addi    r1,r1,0x20
-    lwz     r4,-0x3418(13)          /* displaced instruction */
+    .long   ACCF_DISP_LINK          /* displaced instruction (lwz r4,SDA(r13)) */
     b       ret_link
 
 /* after KPADRead: r31 = controller, r3 = sample count */

@@ -27,6 +27,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'gcpad'))
 import dist
 import patch_dol
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'weather'))
+import apply_weather
 from dol import Dol
 
 try:
@@ -83,7 +85,7 @@ def gcpad_dir():
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'gcpad')
 
 
-def run_patch(image_path, log, done, gc=False):
+def run_patch(image_path, log, done, gc=False, weather=False):
     try:
         wit = find_wit()
         if wit is None:
@@ -137,6 +139,9 @@ def run_patch(image_path, log, done, gc=False):
             if gc:
                 data = patch_dol.apply(data, patch_dol.load(key, root=gcpad_dir()))
                 log('  added GameCube controller (port 1) support')
+            if weather:
+                data = apply_weather.apply(data, key)
+                log('  added Forecast Channel weather')
             open(dol_path, 'wb').write(data)
             log('  patched main.dol (%d writes)' % len(patches))
 
@@ -187,6 +192,13 @@ class App(BASE):
         self.gc = tk.BooleanVar(value=False)
         tk.Checkbutton(self, text='Also add GameCube controller support (port 1)',
                        variable=self.gc).pack()
+
+        self.weather = tk.BooleanVar(value=False)
+        wcb = tk.Checkbutton(self, text='Also add Forecast Channel weather (needs weather_patches.json)',
+                             variable=self.weather)
+        wcb.pack()
+        if not apply_weather.available():
+            wcb.configure(state='disabled')
 
         tk.Label(self, text='The original is kept alongside as <name>.bak',
                  fg='#666').pack()
@@ -252,7 +264,7 @@ class App(BASE):
             args=(image_path,
                   lambda t: self.msgq.put(('log', t)),
                   lambda ok, m: self.msgq.put(('done', (ok, m))),
-                  self.gc.get()),
+                  self.gc.get(), self.weather.get()),
             daemon=True,
         ).start()
 

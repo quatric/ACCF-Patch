@@ -15,3 +15,4 @@ work_ios58/
 __pycache__/
 *.pyc
 .DS_Store
+weather_patches.json

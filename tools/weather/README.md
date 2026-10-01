@@ -3,7 +3,7 @@
 Replaces the town's weather (and the TV's "tomorrow" forecast) with the Forecast Channel's 7-day data for the console's own location. The City keeps its own weather.
 Hold **B** (Wii Remote or Classic Controller) while booting, before the title screen, to turn it off for that session.
 
-Supports City Folk Deluxe (USA) `RUUE02` only. It ships as a patched `main.dol` or a Riivolution XML, not a Gecko code (13 KB of code, and it moves the heap start in `OSInit`).
+Supports every revision: `RUUE01v0`/`v1`, `RUUP01v0`/`v1`, `RUUJ01v1`/`v2`, `RUUK01v1` and the Deluxe discs `RUUE02`, `RUUP02`, `RUUJ02`, `RUUK02`. It was written against `RUUE02`; `wregions.py` finds every address in the others (the same masked-instruction matching as `gcpad/anchors.py`) and the build checks each transplanted branch. It ships as a patched `main.dol` or a Riivolution XML, not a Gecko code (13 KB of code, and it moves the heap start in `OSInit`). Korea has no Forecast Channel, so there the patch falls back to vanilla weather.
 
 ## Build
 
@@ -11,6 +11,15 @@ Supports City Folk Deluxe (USA) `RUUE02` only. It ships as a patched `main.dol` 
 
 needs devkitPPC (`DEVKITPPC`, default `/opt/devkitpro/devkitPPC`). The donor supplies the RVL_MWM-FCD machine code (`fcdgen.py` relocates it). Outputs: `main.weather.dol`,
 `RUUE02-weather.xml`, `weather-patch.json`. Add `--trace` / `--selftest` only for diagnostics. `gen_weather_map.py` regenerates `weather_map.inc` from WiiLink's `weather.xml`.
+
+## All revisions, and in the patcher
+
+    python3 build_all.py --dols <dir of <REV>.dol> --donor <Mario & Sonic main.dol> --out build/
+
+builds every revision (`build/<REV>/main.weather.dol`, `build/riivolution/<REV>-weather.xml`) and writes `weather_patches.json`, which the patcher
+(`tools/gui.py`, *Also add Forecast Channel weather*) and `apply_weather.py` use. That file contains the Mario & Sonic Forecast Channel code, so it is
+made on your machine from your own disc and is git-ignored; the checkbox stays disabled without it. It combines with the SDHC patch and the GameCube
+controller patch (each takes its own DOL section; weather sits above the main thread stack, the controller code in low memory).
 
 ## Test
 

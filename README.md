@@ -39,6 +39,12 @@ controller support* in the patcher, or use the per-revision Gecko codes in
 [`gcpad/gecko/`](gcpad/). Controls, how it works and what has (and hasn't)
 been tested are in [`gcpad/README.md`](gcpad/README.md).
 
+## Forecast Channel weather (optional)
+
+Replaces the town's weather with the Forecast Channel's 7-day data for the console's own location (the City keeps its own). Works on every revision;
+see [`tools/weather/README.md`](tools/weather/README.md). It needs a Mario & Sonic Winter Olympics disc to build, so the patcher option only lights up
+after you've run `tools/weather/build_all.py` once.
+
 ## What it does
 
 City Folk's bundled PFD SD driver only understands standard-capacity cards: it

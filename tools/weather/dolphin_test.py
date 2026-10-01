@@ -140,7 +140,7 @@ def main():
     try:
         print("stop reply:", g.cmd("?"))
         disc_id = g.read_mem(0x80000000, 6).decode("ascii", "replace")
-        check(disc_id == "RUUE02", "disc id is %r" % disc_id)
+        check(disc_id == info.get("disc_id", "RUUE02"), "disc id is %r" % disc_id)
         g.cont()
         print("running %ds ..." % secs)
         time.sleep(secs)
@@ -183,15 +183,12 @@ def main():
         if "g_fetch_status" in sym:
             st = struct.unpack(">5i", g.read_mem(sym["g_fetch_status"], 20))
             print("  fetch status: lock=%d FCDInit=%d ownAreaId=%#x getOwnId=%d firstForecast=%d  (99 = not reached)" % st)
-        r13 = 0x807516C0
-        kind = g.read_mem(r13 - 0x6384, 1)[0]
-        table = struct.unpack(">68I", g.read_mem(0x80479BE0, 68 * 4))
-        flags = table[kind] if kind < 0x44 else 0
-        print("  current scene kind %#04x, flags %#010x -> %s" % (kind, flags, "CITY: weather not overridden" if flags & 0x200 else "not the City: forecast applies"))
-        check(table[0x27] == 0x10001290 and table[1] == 0x01000450, "scene flag table at 0x80479be0 is the one the hook reads")
-        vf_count = struct.unpack(">I", g.read_mem(r13 - 0x1B48, 4))[0]
-        vf_base = struct.unpack(">I", g.read_mem(r13 - 0x1B38, 4))[0]
-        print("  City Folk VF library: drive slots = %d, slot table at %#010x (0 = VFInit has not run)" % (vf_count, vf_base))
+        R = info.get("region", {})
+        r13 = R.get("r13", 0x807516C0)
+        kind = g.read_mem(r13 + R.get("scene_kind", -0x6384), 1)[0]
+        city = g.read_mem(R.get("city_table", 0x80479F10), 0x44)
+        is_city = kind == 0x3D or (kind < 0x44 and city[kind])
+        print("  current scene kind %#04x -> %s" % (kind, "CITY: weather not overridden" if is_city else "not the City: forecast applies"))
         if "fcd_trace" in sym and info.get("trace_names"):
             vals = struct.unpack(">%di" % len(info["trace_names"]), g.read_mem(sym["fcd_trace"], 4 * len(info["trace_names"])))
             print("  FCDInit call results (0 = never executed):")
@@ -205,7 +202,7 @@ def main():
             hdr = g.read_mem(c_tmp, 16)
             sz = hdr[1] | hdr[2] << 8 | hdr[3] << 16
             print("  last file read (chunk head): %s  -> type byte %#04x, claims %d (%#x) bytes decompressed (limit for short.bin is 0x5000)" % (hdr.hex(), hdr[0], sz, sz))
-        wptr = struct.unpack(">I", g.read_mem(r13 - 0x2AD8, 4))[0]
+        wptr = struct.unpack(">I", g.read_mem(r13 + R.get("weather_obj", -0x2AD8), 4))[0]
         if 0x80000000 <= wptr < 0x94000000:
             wcur, wnext = struct.unpack(">II", g.read_mem(wptr + 0x5884, 8))
             windoor, wsnow = g.read_mem(wptr + 0x5894, 2)

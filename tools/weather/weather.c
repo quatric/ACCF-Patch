@@ -172,7 +172,7 @@ void weather_on_module_link(u32 id)
     static u8 done;
     if (!done && (id == 0xA5 || id == 0xA2 || id == 0x01)) {
         done = 1;
-        weather_type_for_date((const CalTime *)0x80600898);
+        weather_type_for_date((const CalTime *)ACCF_CALENDAR);
     }
 #endif
     if (id == 0xA5 || id == 0xA6 || id == 0xA2 || id == 0x01)

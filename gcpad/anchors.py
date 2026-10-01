@@ -35,17 +35,25 @@ class Finder:
         self.tbase = a
         self.tm = [mask(w) for w in self.tw]
 
-    def locate(self, ref_va, n=24):
+    def _hits(self, rm, tm, tbase, n):
+        hits, first = [], rm[0]
+        for i in range(len(tm) - n):
+            if tm[i] == first and tm[i:i + n] == rm:
+                hits.append(tbase + i * 4)
+        return hits
+
+    def locate(self, ref_va, n=24, ordered=False):
+        """address in the target of the code at ref_va; must match exactly once, unless
+        `ordered`: identical twins are then told apart by their order in the image"""
         rw = words(self.ref, ref_va, n)
         rm = [mask(w) for w in rw]
-        hits = []
-        first = rm[0]
-        tm = self.tm
-        for i in range(len(tm) - n):
-            if tm[i] != first:
-                continue
-            if tm[i:i + n] == rm:
-                hits.append(self.tbase + i * 4)
+        hits = self._hits(rm, self.tm, self.tbase, n)
+        if len(hits) != 1 and ordered:
+            o, a, s, _ = [x for x in self.ref.secs if x[3] == 1][0]
+            rtm = [mask(w) for w in struct.unpack('>%dI' % (s // 4), self.ref.data[o:o + s])]
+            rhits = self._hits(rm, rtm, a, n)
+            if len(rhits) == len(hits) and ref_va in rhits:
+                return hits[rhits.index(ref_va)]
         if len(hits) != 1:
             raise SystemExit('anchor %08X: %d matches' % (ref_va, len(hits)))
         return hits[0]
