@@ -1,16 +1,8 @@
 #!/usr/bin/env python3
-"""Rasterize assets/leaf-source.svg into the app icon.
+"""Build the app icon from assets/logo.png (the Animal Crossing: City Folk logo).
 
-Source: the Animal Crossing leaf, from
-https://commons.wikimedia.org/wiki/File:Animal_Crossing_Leaf.svg -- Commons
-tags it public domain (below the threshold of originality for copyright) but
-notes it may still be a protected trademark in some jurisdictions; this is a
-fan patch for the same game, not a competing product, but that's a judgment
-call for whoever redistributes builds, not a settled legal fact.
-
-Requires ImageMagick (`magick`/`convert`) to rasterize the SVG, and
-`iconutil` (macOS only) for the .icns. Emits:
-  assets/icon.png   (1024x1024 source, transparent, padded to square)
+The logo is padded to a transparent square, then written out as:
+  assets/icon.png   (1024x1024)
   assets/icon.ico   (Windows, multi-size)
   assets/icon.icns  (macOS, via iconutil -- macOS only)
 """
@@ -23,26 +15,18 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, '..', 'assets')
-SVG = os.path.join(OUT, 'leaf-source.svg')
+LOGO = os.path.join(OUT, 'logo.png')
 SIZE = 1024
-PAD_FRACTION = 0.84  # leaf content fills this fraction of the square canvas
-
-
-def magick_bin():
-    for name in ('magick', 'convert'):
-        if shutil.which(name):
-            return name
-    sys.exit('ImageMagick (magick/convert) not found on PATH')
+PAD_FRACTION = 0.92  # logo fills this fraction of the square canvas
 
 
 def make_png(png_path):
+    logo = Image.open(LOGO).convert('RGBA')
     content = int(SIZE * PAD_FRACTION)
-    subprocess.run([
-        magick_bin(), '-background', 'none', '-density', '1200', SVG,
-        '-resize', f'{content}x{content}',
-        '-gravity', 'center', '-background', 'none', '-extent', f'{SIZE}x{SIZE}',
-        png_path,
-    ], check=True)
+    logo.thumbnail((content, content), Image.LANCZOS)
+    canvas = Image.new('RGBA', (SIZE, SIZE), (0, 0, 0, 0))
+    canvas.paste(logo, ((SIZE - logo.width) // 2, (SIZE - logo.height) // 2), logo)
+    canvas.save(png_path)
 
 
 def make_ico(png_path, ico_path):
@@ -68,14 +52,14 @@ def make_icns(png_path, icns_path):
 
 
 def main():
-    if not os.path.isfile(SVG):
-        sys.exit('missing %s' % SVG)
+    if not os.path.isfile(LOGO):
+        sys.exit('missing %s' % LOGO)
     os.makedirs(OUT, exist_ok=True)
     png_path = os.path.join(OUT, 'icon.png')
     ico_path = os.path.join(OUT, 'icon.ico')
     icns_path = os.path.join(OUT, 'icon.icns')
 
-    print('rasterizing', SVG)
+    print('reading', LOGO)
     make_png(png_path)
     print('  wrote', png_path)
 

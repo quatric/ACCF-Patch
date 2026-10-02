@@ -1,5 +1,7 @@
 # ACCF-SDHC
 
+![Animal Crossing: City Folk](assets/logo.png)
+
 A patcher for *Animal Crossing: City Folk* (Wii) that adds three optional extras:
 
 - **SDHC card support**: save in-game photos to SD cards larger than 2 GB.
@@ -242,13 +244,10 @@ disc revision, but don't need a source dump, `wit`, or the GUI at all -- they're
 a no-tooling fallback for anyone who'd rather not run an unsigned downloaded app,
 or whose platform isn't one of the three above.
 
-The app icon (`assets/icon.png`/`.ico`/`.icns`, generated from
-`assets/leaf-source.svg` by `tools/make_icon.py`) is the Animal Crossing leaf
-from [Wikimedia
-Commons](https://commons.wikimedia.org/wiki/File:Animal_Crossing_Leaf.svg).
-Commons tags it public domain (below the threshold of originality for
-copyright) but notes it may still be a protected trademark in some
-jurisdictions -- worth knowing if you redistribute your own builds.
+The app icon and logo (`assets/icon.*`, `assets/logo.png`) are the *Animal Crossing:
+City Folk* logo; `tools/make_icon.py` builds the icon files from it. It's
+Nintendo's artwork and trademark, used here only to identify the game this
+fan patch is for.
 
 ## How it works
 

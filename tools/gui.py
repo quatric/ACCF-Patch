@@ -41,6 +41,12 @@ except ImportError:                                    # fall back to click-to-b
     HAVE_DND = False
 
 
+def asset(name):
+    if getattr(sys, 'frozen', False):
+        return os.path.join(getattr(sys, '_MEIPASS', os.path.dirname(sys.executable)), 'assets', name)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets', name)
+
+
 def find_wit():
     """A wit bundled with this app (PyInstaller build) wins over PATH.
 
@@ -204,9 +210,16 @@ class App(BASE):
     def __init__(self):
         super().__init__()
         self.title('ACCF-Patcher')
-        self.geometry('600x500')
+        self.geometry('600x640')
         self.msgq = queue.Queue()
         self.busy = False
+
+        try:
+            img = tk.PhotoImage(file=asset('logo.png'))
+            self.logo = img.subsample(max(1, img.width() // 220))
+            tk.Label(self, image=self.logo).pack(pady=(10, 0))
+        except Exception:                              # the window is fine without its logo
+            pass
 
         hint = ('Drop a .wbfs or .iso here\n\n(or click to choose one)'
                 if HAVE_DND else 'Click to choose a .wbfs or .iso')
