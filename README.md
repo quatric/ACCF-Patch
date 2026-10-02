@@ -1,6 +1,6 @@
 # ACCF-SDHC
 
-![Animal Crossing: City Folk](assets/logo.png)
+<p align="center"><img src="assets/logo.png" alt="Animal Crossing: City Folk" width="300"></p>
 
 A patcher for *Animal Crossing: City Folk* (Wii) that adds three optional extras:
 
