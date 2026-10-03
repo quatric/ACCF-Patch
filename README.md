@@ -297,3 +297,7 @@ some build this port doesn't know about.
 GDB stub (`GDBPort` in `Dolphin.ini`, launch with `-d`). The stub accepts one
 client per run, so it does halt → resume → interrupt → verify in a single
 connection.
+
+### Modded images
+
+Disc patchers match the first four characters of the game ID (ID4), so mods can change the last two characters. The original disc ID and filename are preserved. Revision and executable patch-site checks still apply; mods that change required code may be incompatible.

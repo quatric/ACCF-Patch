@@ -25,6 +25,7 @@ from tkinter import filedialog, messagebox
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'gcpad'))
+from disc_ids import match_disc_id
 import dist
 import patch_dol
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'weather'))
@@ -82,8 +83,10 @@ def read_disc_id(fst):
 
 
 def key_for(disc_id, disc_ver):
-    for key, (label, _src, delta, tid, tver) in dist.TARGETS.items():
-        if tid == disc_id and tver == disc_ver:
+    targets = list(dist.TARGETS.items())
+    targets.sort(key=lambda item: item[1][3] != disc_id)
+    for key, (label, _src, delta, tid, tver) in targets:
+        if tid[:4] == disc_id[:4] and tver == disc_ver:
             return key, label, delta
     return None, None, None
 
@@ -125,14 +128,15 @@ def run_patch(image_path, log, done, sdhc=True, gc=False, weather=False):
             if not (sdhc or gc or weather):
                 raise RuntimeError('nothing selected: tick at least one patch')
             key, label, delta = key_for(disc_id, disc_ver)
-            if not key and disc_id in KOREA:
+            korean_id = match_disc_id(disc_id, KOREA)
+            if not key and korean_id:
                 if sdhc and not (gc or weather):
                     raise RuntimeError('Korean discs already support SDHC cards; tick the controller '
                                        'or weather patch instead.')
                 if sdhc:
                     log('Korean disc: SDHC is already supported, skipping that patch')
                     sdhc = False
-                key, label = KOREA[disc_id]
+                key, label = KOREA[korean_id]
             if not key:
                 raise RuntimeError(
                     '%s v%d is not a supported target.\n\n'
