@@ -34,9 +34,14 @@ Works with every retail region and revision, plus City Folk Deluxe. SDHC support
 
 The patcher refuses a disc it doesn't recognize rather than guess, so it can't apply the wrong revision's addresses.
 
-### Turning weather off
+### Weather boot options
 
-Hold **B** (Wii Remote or Classic Controller) while the game boots, **before the title screen**, to disable the Forecast Channel weather for that session.
+Choose either weather mode in the patcher:
+
+- **On by default:** hold **B** during boot to disable Forecast Channel weather for that session.
+- **Off by default:** hold **B** during boot to enable Forecast Channel weather for that session.
+
+Hold B on the Wii Remote or Classic Controller **before the title screen**. The choice lasts for the session; pressing B after the title screen does not change it.
 
 ### Korean discs
 

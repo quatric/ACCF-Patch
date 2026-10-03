@@ -1,7 +1,7 @@
 # City Folk weather from the Forecast Channel
 
 Replaces the town's weather (and the TV's "tomorrow" forecast) with the Forecast Channel's 7-day data for the console's own location. The City keeps its own weather.
-Hold **B** (Wii Remote or Classic Controller) while booting, before the title screen, to turn it off for that session.
+The patcher offers two boot modes: weather on by default with **B** to disable, or weather off by default with **B** to enable. Hold B on the Wii Remote or Classic Controller before the title screen; the choice lasts for the session.
 
 Supports every revision: `RUUE01v0`/`v1`, `RUUP01v0`/`v1`, `RUUJ01v1`/`v2`, `RUUK01v1` and the Deluxe discs `RUUE02`, `RUUP02`, `RUUJ02`, `RUUK02`. It was written against `RUUE02`; `wregions.py` finds every address in the others (the same masked-instruction matching as `gcpad/anchors.py`) and the build checks each transplanted branch. It ships as a patched `main.dol` or a Riivolution XML, not a Gecko code (13 KB of code, and it moves the heap start in `OSInit`). Korea has no Forecast Channel, so there the patch falls back to vanilla weather.
 
@@ -10,7 +10,7 @@ Supports every revision: `RUUE01v0`/`v1`, `RUUP01v0`/`v1`, `RUUJ01v1`/`v2`, `RUU
     python3 build_patch.py --accf <RUUE02 sys/main.dol> --donor <Mario & Sonic Winter Olympics (USA) sys/main.dol> --out build/
 
 needs devkitPPC (`DEVKITPPC`, default `/opt/devkitpro/devkitPPC`). The donor supplies the RVL_MWM-FCD machine code (`fcdgen.py` relocates it). Outputs: `main.weather.dol`,
-`RUUE02-weather.xml`, `weather-patch.json`. Add `--trace` / `--selftest` only for diagnostics. `gen_weather_map.py` regenerates `weather_map.inc` from WiiLink's `weather.xml`.
+`RUUE02-weather.xml`, `weather-patch.json`. Add `--enable-with-b` for the off-by-default variant. Add `--trace` / `--selftest` only for diagnostics. `gen_weather_map.py` regenerates `weather_map.inc` from WiiLink's `weather.xml`.
 
 ## All revisions, and in the patcher
 

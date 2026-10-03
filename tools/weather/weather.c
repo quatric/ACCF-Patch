@@ -18,7 +18,10 @@ static u8  g_tries;          /* failed fetch attempts on g_lastTryDay */
 #define WEATHER_MAX_TRIES 3
 #define WEATHER_RETRY_CALLS 240     /* hook calls between attempts (about a few seconds of frames) */
 static s32 g_wait;           /* hook calls left before the next attempt */
-static u8  g_off;           /* latched by the B button */
+#ifndef WEATHER_ENABLE_WITH_B
+#define WEATHER_ENABLE_WITH_B 0
+#endif
+static u8  g_off = WEATHER_ENABLE_WITH_B; /* B selects the opposite boot default */
 static u8  g_titleReached;
 
 void weather_reset(void)
@@ -28,7 +31,7 @@ void weather_reset(void)
     g_lastTryDay = -0x7FFFFFFF;
     g_tries = 0;
     g_wait = 0;
-    g_off = 0;
+    g_off = WEATHER_ENABLE_WITH_B;
     g_titleReached = 0;
 }
 
@@ -142,9 +145,9 @@ void weather_sample_buttons(u32 coreHold, u8 devType, u32 classicHold)
     if (g_titleReached)
         return;
     if (coreHold & WEATHER_CORE_B)
-        g_off = 1;
+        g_off = !WEATHER_ENABLE_WITH_B;
     if (devType == WEATHER_KPAD_DEV_CLASSIC && (classicHold & WEATHER_CLASSIC_B))
-        g_off = 1;
+        g_off = !WEATHER_ENABLE_WITH_B;
 }
 
 void weather_title_reached(void) { g_titleReached = 1; }

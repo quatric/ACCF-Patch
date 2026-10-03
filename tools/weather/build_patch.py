@@ -76,7 +76,7 @@ def write_region(out, r, link_word):
     open(os.path.join(out, "region.ld"), "w").write("\n".join(ld) + "\n")
 
 
-def build_blob(donor, out, region, link_word, trace=False, selftest=False):
+def build_blob(donor, out, region, link_word, trace=False, selftest=False, enable_with_b=False):
     base = region["base"]
     os.makedirs(out, exist_ok=True)
     write_region(out, region, link_word)
@@ -85,7 +85,7 @@ def build_blob(donor, out, region, link_word, trace=False, selftest=False):
     open(asm, "w").write(src)
     obj = lambda n: os.path.join(out, n)
     for c in ("weather", "fcd_fetch", "fcd_loader"):
-        run([GCC] + CFLAGS + ["-I", out] + (["-DWEATHER_SELFTEST"] if selftest and c == "weather" else []) + ["-c", os.path.join(HERE, c + ".c"), "-o", obj(c + ".o")])
+        run([GCC] + CFLAGS + ["-I", out, "-DWEATHER_ENABLE_WITH_B=%d" % enable_with_b] + (["-DWEATHER_SELFTEST"] if selftest and c == "weather" else []) + ["-c", os.path.join(HERE, c + ".c"), "-o", obj(c + ".o")])
     run([GCC, "-mcpu=750", "-Wa,-mregnames", "-DACCF_DISP_LINK=0x%08X" % link_word, "-c", os.path.join(HERE, "hooks.S"), "-o", obj("hooks.o")])
     run([GCC, "-mcpu=750", "-Wa,-mregnames", "-c", asm, "-o", obj("fcd_relocated.o")])
     elf = obj("weather.elf")
@@ -282,13 +282,13 @@ def riivolution_xml(rev, patches):
     return "\n".join(L) + "\n"
 
 
-def build_rev(rev, accf, ref, donor, out, trace=False, selftest=False):
+def build_rev(rev, accf, ref, donor, out, trace=False, selftest=False, enable_with_b=False):
     """Build the patch for one revision; writes main.weather.dol, <rev>-weather.xml, weather-patch.json into out."""
     raw = open(accf, "rb").read()
     region = wregions.resolve(Dol(ref), Dol(accf))
     link_word = struct.unpack(">I", dol_reader(raw)(region["link"], 4))[0]
     base = region["base"]
-    blob, syms, info = build_blob(donor, out, region, link_word, trace=trace, selftest=selftest)
+    blob, syms, info = build_blob(donor, out, region, link_word, trace=trace, selftest=selftest, enable_with_b=enable_with_b)
     checked, bad = verify_transplant(blob, base, syms, info)
     print("%s: blob %#x bytes at %#010x (ends %#010x)" % (rev, len(blob), base, base + len(blob)))
     print("  transplant check: %d branches verified, %d problems" % (checked, len(bad)))
@@ -320,8 +320,9 @@ def main():
     ap.add_argument("--rev", default="RUUE02", help="revision key (see REVS)")
     ap.add_argument("--selftest", action="store_true", help="test build: fetch once at the title (never ship)")
     ap.add_argument("--trace", action="store_true", help="record FCDInit call results in fcd_trace (diagnostics)")
+    ap.add_argument("--enable-with-b", action="store_true", help="weather is off unless B is held before the title screen")
     a = ap.parse_args()
-    build_rev(a.rev, a.accf, a.ref or a.accf, a.donor, a.out, trace=a.trace, selftest=a.selftest)
+    build_rev(a.rev, a.accf, a.ref or a.accf, a.donor, a.out, trace=a.trace, selftest=a.selftest, enable_with_b=a.enable_with_b)
     return 0
 
 

@@ -1,7 +1,7 @@
 """Add the Forecast Channel weather patch to a City Folk main.dol (for the patcher).
 
-The patch data (weather_patches.json) is made by build_all.py from your own Mario & Sonic disc, so it
-exists only on machines where you ran that.  available() says whether it does.
+The bundled patch data contains both boot modes. build_all.py regenerates it
+from the reference discs; available() checks whether the data is installed.
 """
 import json, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -17,8 +17,18 @@ def available(root=HERE):
     return os.path.exists(path(root))
 
 
-def apply(data, rev, root=HERE):
-    p = json.load(open(path(root)))[rev]
+MODES = ('disable_with_b', 'enable_with_b')
+
+
+def apply(data, rev, root=HERE, mode='disable_with_b'):
+    if mode not in MODES:
+        raise ValueError('unknown weather boot mode: %s' % mode)
+    with open(path(root)) as source:
+        p = json.load(source)[rev]
+    if mode == 'enable_with_b':
+        if 'enable_with_b' not in p:
+            raise RuntimeError('weather data does not include the hold-B-to-enable mode; regenerate it')
+        p = p['enable_with_b']
     dol = patch_dol.Dol(data)
     for w in p['patches']:
         fo = dol.v2f(w['address'])

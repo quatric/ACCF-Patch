@@ -103,7 +103,7 @@ def gcpad_dir():
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'gcpad')
 
 
-def run_patch(image_path, log, done, sdhc=True, gc=False, weather=False):
+def run_patch(image_path, log, done, sdhc=True, gc=False, weather=False, weather_mode='disable_with_b'):
     try:
         wit = find_wit()
         if wit is None:
@@ -180,8 +180,9 @@ def run_patch(image_path, log, done, sdhc=True, gc=False, weather=False):
             if weather:
                 if apply_weather is None or not apply_weather.available():
                     raise RuntimeError('weather patch data (weather_patches.json) is not available')
-                data = apply_weather.apply(data, key)
-                log('  added Forecast Channel weather')
+                data = apply_weather.apply(data, key, mode=weather_mode)
+                log('  added Forecast Channel weather (%s)' %
+                    ('hold B to enable' if weather_mode == 'enable_with_b' else 'hold B to disable'))
             open(dol_path, 'wb').write(data)
             log('  patched main.dol')
 
@@ -214,7 +215,7 @@ class App(BASE):
     def __init__(self):
         super().__init__()
         self.title('ACCF-Patcher')
-        self.geometry('600x640')
+        self.geometry('600x700')
         self.msgq = queue.Queue()
         self.busy = False
 
@@ -249,6 +250,20 @@ class App(BASE):
         wcb = tk.Checkbutton(opts, text='Forecast Channel weather (7-day forecast for your location)',
                              variable=self.weather)
         wcb.pack(anchor='w')
+        self.weather_mode = tk.StringVar(value='disable_with_b')
+        modes = []
+        for label, value in (('On by default — hold B during boot to disable', 'disable_with_b'),
+                             ('Off by default — hold B during boot to enable', 'enable_with_b')):
+            button = tk.Radiobutton(opts, text=label, variable=self.weather_mode, value=value)
+            button.pack(anchor='w', padx=20)
+            modes.append(button)
+
+        def update_weather_modes(*_):
+            state = 'normal' if self.weather.get() and apply_weather is not None and apply_weather.available() else 'disabled'
+            for button in modes:
+                button.configure(state=state)
+        self.weather.trace_add('write', update_weather_modes)
+        update_weather_modes()
         if apply_weather is None or not apply_weather.available():
             wcb.configure(state='disabled')
 
@@ -316,7 +331,7 @@ class App(BASE):
             args=(image_path,
                   lambda t: self.msgq.put(('log', t)),
                   lambda ok, m: self.msgq.put(('done', (ok, m))),
-                  self.sdhc.get(), self.gc.get(), self.weather.get()),
+                  self.sdhc.get(), self.gc.get(), self.weather.get(), self.weather_mode.get()),
             daemon=True,
         ).start()
 

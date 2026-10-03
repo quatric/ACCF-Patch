@@ -30,6 +30,10 @@ def main():
         os.replace(os.path.join(out, rev + "-weather.xml"), os.path.join(a.out, "riivolution", rev + "-weather.xml"))
         allp[rev] = {"base": info["base"], "blob": info["blob"],
                      "patches": info["patches"]}
+        inverse_out = os.path.join(a.out, 'enable-with-b', rev)
+        inverse = build_patch.build_rev(rev, os.path.join(a.dols, rev + ".dol"), ref,
+                                        a.donor, inverse_out, enable_with_b=True)
+        allp[rev]['enable_with_b'] = {name: inverse[name] for name in ('base', 'blob', 'patches')}
     json.dump(allp, open(os.path.join(HERE, "weather_patches.json"), "w"))
     print("wrote weather_patches.json (%d revisions)" % len(allp))
 
